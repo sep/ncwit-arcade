@@ -1,0 +1,1114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barbie Road Raider</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --sky-1: #ffd6ec;
+            --sky-2: #ffc6a8;
+            --hud-bg: rgba(27, 19, 44, 0.72);
+            --hud-border: rgba(255, 255, 255, 0.24);
+            --hud-text: #fff9ff;
+            --accent: #ff3ea5;
+            --accent-2: #ff8d6a;
+            --warning: #ffd36b;
+            --danger: #ff4e77;
+            --safe: #56f5ad;
+        }
+
+        body {
+            overflow: hidden;
+            font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+            background: radial-gradient(circle at 30% 10%, var(--sky-1), var(--sky-2));
+            color: var(--hud-text);
+        }
+
+        canvas { display: block; }
+
+        #hud {
+            position: fixed;
+            top: 14px;
+            left: 14px;
+            right: 14px;
+            z-index: 10;
+            display: grid;
+            grid-template-columns: repeat(5, minmax(90px, 1fr));
+            gap: 8px;
+            pointer-events: none;
+        }
+
+        .panel {
+            background: var(--hud-bg);
+            border: 1px solid var(--hud-border);
+            border-radius: 12px;
+            padding: 10px 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+            backdrop-filter: blur(6px);
+        }
+
+        .label {
+            font-size: 0.72rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            opacity: 0.8;
+        }
+
+        .value {
+            font-size: 1.12rem;
+            font-weight: 700;
+            margin-top: 2px;
+        }
+
+        #banner,
+        #end-screen,
+        #boss-intro {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background:
+                linear-gradient(135deg, rgba(255, 50, 141, 0.36), rgba(31, 15, 59, 0.86)),
+                radial-gradient(circle at 20% 20%, rgba(255, 230, 240, 0.4), transparent 45%),
+                radial-gradient(circle at 80% 80%, rgba(255, 178, 110, 0.22), transparent 55%);
+            z-index: 20;
+            text-align: center;
+            padding: 24px;
+        }
+
+        #boss-intro {
+            z-index: 19;
+            pointer-events: none;
+            background:
+                radial-gradient(circle at 50% 42%, rgba(166, 233, 255, 0.3), transparent 42%),
+                linear-gradient(180deg, rgba(7, 12, 35, 0.66), rgba(8, 7, 20, 0.84));
+            animation: bossFlash 0.24s ease-out 2;
+        }
+
+        #boss-intro h2 {
+            font-size: clamp(2.2rem, 7.5vw, 5.3rem);
+            letter-spacing: 0.11em;
+            text-transform: uppercase;
+            color: #d8efff;
+            text-shadow: 0 0 30px rgba(123, 210, 255, 0.72), 0 0 60px rgba(62, 176, 255, 0.38);
+        }
+
+        #boss-intro p {
+            margin-top: 10px;
+            letter-spacing: 0.16em;
+            font-size: clamp(0.9rem, 2.2vw, 1.2rem);
+            text-transform: uppercase;
+            color: #ffd7ea;
+        }
+
+        @keyframes bossFlash {
+            0% { opacity: 0; }
+            12% { opacity: 1; }
+            100% { opacity: 1; }
+        }
+
+        h1 {
+            font-size: clamp(2rem, 5.8vw, 4.1rem);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            text-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+            margin-bottom: 10px;
+        }
+
+        .sub {
+            max-width: 700px;
+            font-size: clamp(1rem, 2.5vw, 1.24rem);
+            line-height: 1.4;
+            opacity: 0.95;
+            margin-bottom: 18px;
+        }
+
+        .tips {
+            line-height: 1.65;
+            background: rgba(12, 6, 30, 0.45);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 14px 18px;
+            max-width: 720px;
+        }
+
+        button {
+            margin-top: 22px;
+            border: none;
+            border-radius: 999px;
+            padding: 13px 28px;
+            color: #fff;
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            background: linear-gradient(120deg, var(--accent), var(--accent-2));
+            cursor: pointer;
+            box-shadow: 0 14px 32px rgba(0, 0, 0, 0.25);
+        }
+
+        .hidden { display: none !important; }
+
+        #mobile-controls {
+            display: none;
+            position: fixed;
+            bottom: 12px;
+            left: 0;
+            right: 0;
+            z-index: 12;
+            pointer-events: none;
+        }
+
+        .control-row {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .touch {
+            pointer-events: auto;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            background: rgba(31, 20, 56, 0.5);
+            border-radius: 10px;
+            width: 68px;
+            height: 52px;
+            color: white;
+            font-size: 1.2rem;
+            font-weight: 700;
+            user-select: none;
+            -webkit-user-select: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .touch.active { background: rgba(255, 84, 166, 0.7); }
+
+        @media (pointer: coarse), (max-width: 900px) {
+            #mobile-controls { display: block; }
+            #hud {
+                grid-template-columns: repeat(3, minmax(110px, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="hud">
+        <div class="panel"><div class="label">Phase</div><div class="value" id="phase">Relic Hunt</div></div>
+        <div class="panel"><div class="label">Relics</div><div class="value" id="relic-count">0 / 7</div></div>
+        <div class="panel"><div class="label">Health</div><div class="value" id="health">100</div></div>
+        <div class="panel"><div class="label">Speed</div><div class="value" id="speed">0</div></div>
+        <div class="panel"><div class="label">Time</div><div class="value" id="timer">160</div></div>
+    </div>
+
+    <div id="banner">
+        <h1>Barbie Road Raider</h1>
+        <p class="sub">Grab the relics, survive Ken chase squads, then defeat Huge Ken at the final gate before the storm swallows the canyon.</p>
+        <div class="tips">
+            W/S or Up/Down: throttle and reverse<br>
+            A/D or Left/Right: steer<br>
+            Shift: boost (uses fuel bursts)<br>
+            Space: quick hop over low debris<br>
+            Power-ups: Wrench = heal, Shield = block hits, Bolt = overdrive
+        </div>
+        <button id="start-btn">Start Mission</button>
+    </div>
+
+    <div id="end-screen" class="hidden">
+        <h1 id="end-title">Mission Complete</h1>
+        <p id="end-text" class="sub"></p>
+        <button id="restart-btn">Drive Again</button>
+    </div>
+
+    <div id="boss-intro" class="hidden">
+        <h2 id="boss-intro-title">Huge Ken</h2>
+        <p id="boss-intro-sub">Final Rival Activated</p>
+    </div>
+
+    <div id="mobile-controls">
+        <div class="control-row">
+            <div class="touch" id="touch-left">L</div>
+            <div class="touch" id="touch-up">W</div>
+            <div class="touch" id="touch-right">R</div>
+        </div>
+        <div class="control-row">
+            <div class="touch" id="touch-down">S</div>
+            <div class="touch" id="touch-boost">B</div>
+            <div class="touch" id="touch-hop">J</div>
+        </div>
+    </div>
+
+    <script>
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.Fog(0xfccbb8, 40, 210);
+
+        const camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 600);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        const sky = new THREE.Mesh(
+            new THREE.SphereGeometry(500, 32, 20),
+            new THREE.MeshBasicMaterial({ color: 0xf8b7da, side: THREE.BackSide })
+        );
+        scene.add(sky);
+
+        const hemi = new THREE.HemisphereLight(0xffd8f0, 0xf3a96d, 0.88);
+        scene.add(hemi);
+
+        const sun = new THREE.DirectionalLight(0xfff4de, 1.12);
+        sun.position.set(40, 90, 35);
+        sun.castShadow = true;
+        sun.shadow.mapSize.width = 2048;
+        sun.shadow.mapSize.height = 2048;
+        sun.shadow.camera.near = 10;
+        sun.shadow.camera.far = 220;
+        sun.shadow.camera.left = -100;
+        sun.shadow.camera.right = 100;
+        sun.shadow.camera.top = 100;
+        sun.shadow.camera.bottom = -100;
+        scene.add(sun);
+
+        const worldSize = 170;
+        const floor = new THREE.Mesh(
+            new THREE.PlaneGeometry(worldSize * 2, worldSize * 2, 32, 32),
+            new THREE.MeshStandardMaterial({
+                color: 0xe6a069,
+                roughness: 0.96,
+                metalness: 0.03
+            })
+        );
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        const roadMaterial = new THREE.MeshStandardMaterial({ color: 0xc57c57, roughness: 0.95 });
+        const roadSegments = [];
+        for (let i = -5; i <= 5; i++) {
+            const road = new THREE.Mesh(new THREE.BoxGeometry(14, 0.2, worldSize * 2), roadMaterial);
+            road.position.set(i * 24, 0.1, 0);
+            road.receiveShadow = true;
+            scene.add(road);
+            roadSegments.push(road);
+        }
+
+        function makePalm(x, z) {
+            const trunk = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.9, 1.2, 8, 6),
+                new THREE.MeshStandardMaterial({ color: 0x7e4b2f, roughness: 1 })
+            );
+            trunk.position.set(x, 4, z);
+            trunk.castShadow = true;
+            scene.add(trunk);
+
+            const leafMat = new THREE.MeshStandardMaterial({ color: 0x3f8f48, roughness: 0.95 });
+            for (let i = 0; i < 6; i++) {
+                const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.7, 6, 6), leafMat);
+                leaf.position.set(x, 8 + Math.random() * 0.8, z);
+                leaf.rotation.z = (Math.PI / 2.8) + (Math.random() * 0.18);
+                leaf.rotation.y = (Math.PI * 2 * i) / 6;
+                leaf.castShadow = true;
+                scene.add(leaf);
+            }
+        }
+
+        for (let i = 0; i < 36; i++) {
+            const ring = 35 + Math.random() * 120;
+            const angle = Math.random() * Math.PI * 2;
+            makePalm(Math.cos(angle) * ring, Math.sin(angle) * ring);
+        }
+
+        const car = new THREE.Group();
+        const body = new THREE.Mesh(
+            new THREE.BoxGeometry(3.2, 0.85, 5.2),
+            new THREE.MeshStandardMaterial({ color: 0xff3ea5, metalness: 0.65, roughness: 0.3 })
+        );
+        body.position.y = 1.35;
+        body.castShadow = true;
+        car.add(body);
+
+        const cabin = new THREE.Mesh(
+            new THREE.BoxGeometry(2.4, 0.72, 2.25),
+            new THREE.MeshStandardMaterial({ color: 0xffaed7, metalness: 0.24, roughness: 0.46 })
+        );
+        cabin.position.set(0, 1.96, -0.35);
+        cabin.castShadow = true;
+        car.add(cabin);
+
+        const spoiler = new THREE.Mesh(
+            new THREE.BoxGeometry(2.2, 0.16, 0.7),
+            new THREE.MeshStandardMaterial({ color: 0xfee9f6 })
+        );
+        spoiler.position.set(0, 1.67, 2.25);
+        spoiler.castShadow = true;
+        car.add(spoiler);
+
+        const wheelGeom = new THREE.CylinderGeometry(0.52, 0.52, 0.48, 20);
+        const wheelMat = new THREE.MeshStandardMaterial({ color: 0x1f1926, roughness: 0.5, metalness: 0.4 });
+        const wheelOffsets = [
+            [-1.45, 0.8, -1.7],
+            [1.45, 0.8, -1.7],
+            [-1.45, 0.8, 1.7],
+            [1.45, 0.8, 1.7]
+        ];
+
+        const wheels = [];
+        wheelOffsets.forEach((offset) => {
+            const wheel = new THREE.Mesh(wheelGeom, wheelMat);
+            wheel.rotation.z = Math.PI / 2;
+            wheel.position.set(offset[0], offset[1], offset[2]);
+            wheel.castShadow = true;
+            car.add(wheel);
+            wheels.push(wheel);
+        });
+
+        const glow = new THREE.PointLight(0xff69bf, 1.3, 24);
+        glow.position.set(0, 2.7, 0);
+        car.add(glow);
+
+        car.position.set(0, 0.22, 0);
+        scene.add(car);
+
+        const relics = [];
+        const relicGeom = new THREE.OctahedronGeometry(1.03, 0);
+        const relicMat = new THREE.MeshStandardMaterial({
+            color: 0xfff3b5,
+            emissive: 0xffc96f,
+            emissiveIntensity: 0.7,
+            roughness: 0.25,
+            metalness: 0.4
+        });
+
+        function spawnRelics() {
+            relics.forEach((r) => scene.remove(r.mesh));
+            relics.length = 0;
+            for (let i = 0; i < 7; i++) {
+                const laneX = (Math.floor(Math.random() * 7) - 3) * 24;
+                const z = (Math.random() - 0.5) * (worldSize * 1.6);
+                const mesh = new THREE.Mesh(relicGeom, relicMat.clone());
+                mesh.position.set(laneX + (Math.random() - 0.5) * 7, 2.9 + Math.random() * 0.8, z);
+                mesh.castShadow = true;
+                scene.add(mesh);
+                relics.push({ mesh, collected: false, bobPhase: Math.random() * Math.PI * 2 });
+            }
+        }
+
+        const hazards = [];
+        const hazardGeom = new THREE.DodecahedronGeometry(1.5, 0);
+        const hazardMat = new THREE.MeshStandardMaterial({ color: 0x5f4b3d, roughness: 1, metalness: 0.05 });
+
+        const kenChasers = [];
+        const powerups = [];
+
+        function createKenCar(index) {
+            const ken = new THREE.Group();
+
+            const kenBody = new THREE.Mesh(
+                new THREE.BoxGeometry(2.8, 0.75, 4.5),
+                new THREE.MeshStandardMaterial({ color: 0x5dc0ff, roughness: 0.38, metalness: 0.48 })
+            );
+            kenBody.position.y = 1.1;
+            kenBody.castShadow = true;
+            ken.add(kenBody);
+
+            const kenCabin = new THREE.Mesh(
+                new THREE.BoxGeometry(1.9, 0.62, 2.2),
+                new THREE.MeshStandardMaterial({ color: 0xbce7ff, roughness: 0.42, metalness: 0.2 })
+            );
+            kenCabin.position.set(0, 1.7, -0.2);
+            kenCabin.castShadow = true;
+            ken.add(kenCabin);
+
+            const kenHead = new THREE.Mesh(
+                new THREE.SphereGeometry(0.34, 14, 14),
+                new THREE.MeshStandardMaterial({ color: 0xffdfc6, roughness: 0.68, metalness: 0.04 })
+            );
+            kenHead.position.set(0, 2.15, -0.5);
+            ken.add(kenHead);
+
+            const kenHair = new THREE.Mesh(
+                new THREE.BoxGeometry(0.42, 0.16, 0.42),
+                new THREE.MeshStandardMaterial({ color: 0xd5b07b, roughness: 0.75 })
+            );
+            kenHair.position.set(0, 2.35, -0.5);
+            ken.add(kenHair);
+
+            const kenJacket = new THREE.Mesh(
+                new THREE.BoxGeometry(2.2, 0.45, 1.25),
+                new THREE.MeshStandardMaterial({ color: 0x355fcb, roughness: 0.7, metalness: 0.1 })
+            );
+            kenJacket.position.set(0, 1.45, 0.65);
+            ken.add(kenJacket);
+
+            const kenBadge = new THREE.Mesh(
+                new THREE.SphereGeometry(0.11, 8, 8),
+                new THREE.MeshStandardMaterial({ color: 0xffeb89, roughness: 0.5 })
+            );
+            kenBadge.position.set(0.58, 1.56, 1.05);
+            ken.add(kenBadge);
+
+            const kenGlow = new THREE.PointLight(0x61cbff, 0.9, 12);
+            kenGlow.position.set(0, 2.2, 0.3);
+            ken.add(kenGlow);
+
+            ken.position.set((index - 1.5) * 8, 0.2, 22 + index * 7);
+            scene.add(ken);
+
+            return {
+                mesh: ken,
+                speed: 0.52 + Math.random() * 0.09,
+                turnRate: 0.04 + Math.random() * 0.02,
+                strikeCooldown: 0
+            };
+        }
+
+        function spawnKens() {
+            while (kenChasers.length > 0) {
+                const k = kenChasers.pop();
+                scene.remove(k.mesh);
+            }
+
+            for (let i = 0; i < 4; i++) {
+                kenChasers.push(createKenCar(i));
+            }
+        }
+
+        function createPowerup(type) {
+            const p = new THREE.Mesh(
+                new THREE.TorusKnotGeometry(0.7, 0.23, 60, 8),
+                new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x222222, roughness: 0.25, metalness: 0.5 })
+            );
+
+            if (type === 'repair') {
+                p.material.color.setHex(0x7ef4b8);
+                p.material.emissive.setHex(0x245d47);
+            } else if (type === 'shield') {
+                p.material.color.setHex(0x7fb2ff);
+                p.material.emissive.setHex(0x203f75);
+            } else {
+                p.material.color.setHex(0xffdb72);
+                p.material.emissive.setHex(0x744d1a);
+            }
+
+            const x = (Math.random() - 0.5) * worldSize * 1.6;
+            const z = (Math.random() - 0.5) * worldSize * 1.6;
+            p.position.set(x, 3, z);
+            p.castShadow = true;
+            scene.add(p);
+            return { mesh: p, type, active: true, phase: Math.random() * Math.PI * 2 };
+        }
+
+        function spawnPowerups() {
+            powerups.forEach((p) => scene.remove(p.mesh));
+            powerups.length = 0;
+
+            const types = ['repair', 'shield', 'overdrive'];
+            for (let i = 0; i < 9; i++) {
+                const type = types[i % types.length];
+                powerups.push(createPowerup(type));
+            }
+        }
+
+        const bossGate = new THREE.Group();
+        const gateRing = new THREE.Mesh(
+            new THREE.TorusGeometry(6.5, 0.65, 18, 46),
+            new THREE.MeshStandardMaterial({ color: 0xff8cc8, emissive: 0x451133, roughness: 0.2, metalness: 0.6 })
+        );
+        gateRing.rotation.x = Math.PI / 2;
+        gateRing.castShadow = true;
+        bossGate.add(gateRing);
+
+        const gateCore = new THREE.Mesh(
+            new THREE.CircleGeometry(5.2, 32),
+            new THREE.MeshBasicMaterial({ color: 0xffe2f4, transparent: true, opacity: 0.75 })
+        );
+        gateCore.rotation.x = -Math.PI / 2;
+        gateCore.position.y = 0.02;
+        bossGate.add(gateCore);
+
+        const gatePillarGeom = new THREE.CylinderGeometry(0.6, 0.7, 11, 10);
+        const gatePillarMat = new THREE.MeshStandardMaterial({ color: 0xff74bb, roughness: 0.4, metalness: 0.34 });
+        for (let i = -1; i <= 1; i += 2) {
+            const pillar = new THREE.Mesh(gatePillarGeom, gatePillarMat);
+            pillar.position.set(i * 7, 5.5, 0);
+            pillar.castShadow = true;
+            bossGate.add(pillar);
+        }
+        bossGate.position.set(0, 0.2, -145);
+        bossGate.visible = false;
+        scene.add(bossGate);
+
+        const hugeKen = new THREE.Group();
+        const hugeKenTorso = new THREE.Mesh(
+            new THREE.BoxGeometry(14, 12, 6),
+            new THREE.MeshStandardMaterial({ color: 0x4a7fe1, roughness: 0.55, metalness: 0.2 })
+        );
+        hugeKenTorso.position.set(0, 12, 0);
+        hugeKenTorso.castShadow = true;
+        hugeKen.add(hugeKenTorso);
+
+        const hugeKenHead = new THREE.Mesh(
+            new THREE.SphereGeometry(4.5, 24, 24),
+            new THREE.MeshStandardMaterial({ color: 0xffdfc6, roughness: 0.68, metalness: 0.05 })
+        );
+        hugeKenHead.position.set(0, 20.3, 0);
+        hugeKenHead.castShadow = true;
+        hugeKen.add(hugeKenHead);
+
+        const hugeKenHair = new THREE.Mesh(
+            new THREE.BoxGeometry(6.1, 1.5, 5.6),
+            new THREE.MeshStandardMaterial({ color: 0xd9b586, roughness: 0.74 })
+        );
+        hugeKenHair.position.set(0, 23.5, -0.2);
+        hugeKenHair.castShadow = true;
+        hugeKen.add(hugeKenHair);
+
+        const hugeKenArmGeom = new THREE.BoxGeometry(3, 9, 3);
+        const hugeKenArmMat = new THREE.MeshStandardMaterial({ color: 0x4a7fe1, roughness: 0.62 });
+        const leftArm = new THREE.Mesh(hugeKenArmGeom, hugeKenArmMat);
+        const rightArm = new THREE.Mesh(hugeKenArmGeom, hugeKenArmMat);
+        leftArm.position.set(-8.5, 12, 0);
+        rightArm.position.set(8.5, 12, 0);
+        leftArm.castShadow = true;
+        rightArm.castShadow = true;
+        hugeKen.add(leftArm);
+        hugeKen.add(rightArm);
+
+        const hugeKenAura = new THREE.PointLight(0x80c5ff, 2.1, 85);
+        hugeKenAura.position.set(0, 17, 0);
+        hugeKen.add(hugeKenAura);
+
+        hugeKen.position.set(0, 0.2, -132);
+        hugeKen.visible = false;
+        scene.add(hugeKen);
+
+        function spawnHazards() {
+            hazards.forEach((h) => scene.remove(h));
+            hazards.length = 0;
+            for (let i = 0; i < 36; i++) {
+                const x = (Math.random() - 0.5) * worldSize * 1.8;
+                const z = (Math.random() - 0.5) * worldSize * 1.8;
+                if (Math.abs(x) < 8 && Math.abs(z) < 12) {
+                    continue;
+                }
+                const rock = new THREE.Mesh(hazardGeom, hazardMat);
+                rock.position.set(x, 1.5, z);
+                rock.rotation.y = Math.random() * Math.PI;
+                rock.castShadow = true;
+                rock.receiveShadow = true;
+                scene.add(rock);
+                hazards.push(rock);
+            }
+        }
+
+        const state = {
+            running: false,
+            speed: 0,
+            maxSpeed: 1.18,
+            accel: 0.029,
+            turnSpeed: 0.045,
+            drag: 0.972,
+            health: 100,
+            relicsCollected: 0,
+            timer: 160,
+            boostMeter: 100,
+            yVel: 0,
+            grounded: true,
+            crashCooldown: 0,
+            missionPhase: 'Relic Hunt',
+            shieldTimer: 0,
+            overdriveTimer: 0,
+            bossRunActive: false,
+            bossHp: 0,
+            bossStrikeCooldown: 0,
+            bossIntroTimer: 0,
+            shakeTimer: 0,
+            shakeStrength: 0,
+            cameraLag: new THREE.Vector3(0, 8, 16)
+        };
+
+        const keys = {};
+        const touchKeys = {
+            ArrowLeft: false,
+            ArrowRight: false,
+            ArrowUp: false,
+            ArrowDown: false,
+            ShiftLeft: false,
+            Space: false
+        };
+
+        function setTouch(btnId, code) {
+            const btn = document.getElementById(btnId);
+            const on = (e) => {
+                e.preventDefault();
+                touchKeys[code] = true;
+                btn.classList.add('active');
+            };
+            const off = (e) => {
+                e.preventDefault();
+                touchKeys[code] = false;
+                btn.classList.remove('active');
+            };
+            btn.addEventListener('touchstart', on, { passive: false });
+            btn.addEventListener('touchend', off, { passive: false });
+            btn.addEventListener('touchcancel', off, { passive: false });
+            btn.addEventListener('mousedown', on);
+            btn.addEventListener('mouseup', off);
+            btn.addEventListener('mouseleave', off);
+        }
+
+        setTouch('touch-left', 'ArrowLeft');
+        setTouch('touch-right', 'ArrowRight');
+        setTouch('touch-up', 'ArrowUp');
+        setTouch('touch-down', 'ArrowDown');
+        setTouch('touch-boost', 'ShiftLeft');
+        setTouch('touch-hop', 'Space');
+
+        window.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+        });
+        window.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+        });
+
+        const relicCountEl = document.getElementById('relic-count');
+        const phaseEl = document.getElementById('phase');
+        const healthEl = document.getElementById('health');
+        const speedEl = document.getElementById('speed');
+        const timerEl = document.getElementById('timer');
+        const bossIntroEl = document.getElementById('boss-intro');
+
+        function updateHud() {
+            phaseEl.textContent = state.missionPhase;
+            relicCountEl.textContent = state.relicsCollected + ' / ' + relics.length;
+            healthEl.textContent = Math.max(0, Math.round(state.health));
+            if (state.health <= 30) healthEl.style.color = 'var(--danger)';
+            else if (state.health <= 55) healthEl.style.color = 'var(--warning)';
+            else healthEl.style.color = 'var(--safe)';
+
+            speedEl.textContent = Math.round(Math.abs(state.speed) * 95);
+            timerEl.textContent = Math.max(0, Math.ceil(state.timer));
+            timerEl.style.color = state.timer <= 20 ? 'var(--danger)' : 'var(--hud-text)';
+        }
+
+        function applyDamage(amount, failMessage) {
+            if (state.shieldTimer > 0) {
+                return;
+            }
+
+            state.health -= amount;
+            state.shakeTimer = Math.max(state.shakeTimer, 0.3);
+            state.shakeStrength = Math.max(state.shakeStrength, 0.6);
+            if (state.health <= 0) {
+                openEndScreen('Barbie Boxed In', failMessage || 'The chase squad cornered your route.');
+            }
+        }
+
+        function triggerBossIntro() {
+            state.bossIntroTimer = 2.5;
+            state.shakeTimer = 1.05;
+            state.shakeStrength = 1.2;
+            bossIntroEl.classList.remove('hidden');
+        }
+
+        function isPressed(code) {
+            return keys[code] || touchKeys[code];
+        }
+
+        function softReset() {
+            state.running = true;
+            state.speed = 0;
+            state.health = 100;
+            state.relicsCollected = 0;
+            state.timer = 160;
+            state.boostMeter = 100;
+            state.yVel = 0;
+            state.grounded = true;
+            state.crashCooldown = 0;
+            state.missionPhase = 'Relic Hunt';
+            state.shieldTimer = 0;
+            state.overdriveTimer = 0;
+            state.bossRunActive = false;
+            state.bossHp = 0;
+            state.bossStrikeCooldown = 0;
+            state.bossIntroTimer = 0;
+            state.shakeTimer = 0;
+            state.shakeStrength = 0;
+            bossGate.visible = false;
+            hugeKen.visible = false;
+            hugeKen.scale.setScalar(1);
+            bossIntroEl.classList.add('hidden');
+
+            car.position.set(0, 0.22, 0);
+            car.rotation.set(0, 0, 0);
+
+            spawnRelics();
+            spawnHazards();
+            spawnKens();
+            spawnPowerups();
+            updateHud();
+        }
+
+        function openEndScreen(title, text) {
+            state.running = false;
+            document.getElementById('end-title').textContent = title;
+            document.getElementById('end-text').textContent = text;
+            document.getElementById('end-screen').classList.remove('hidden');
+        }
+
+        function collectCheck() {
+            for (const relic of relics) {
+                if (relic.collected) continue;
+                const d = relic.mesh.position.distanceTo(car.position);
+                if (d < 3.2) {
+                    relic.collected = true;
+                    relic.mesh.visible = false;
+                    state.relicsCollected += 1;
+                    state.health = Math.min(100, state.health + 7);
+                    if (state.relicsCollected === relics.length) {
+                        state.missionPhase = 'Huge Ken Showdown';
+                        state.bossRunActive = true;
+                        state.timer += 40;
+                        state.bossHp = 3;
+                        bossGate.visible = true;
+                        hugeKen.visible = true;
+                        hugeKen.position.set(bossGate.position.x, 0.2, bossGate.position.z + 13);
+                        triggerBossIntro();
+
+                        for (let i = 0; i < kenChasers.length; i++) {
+                            kenChasers[i].speed += 0.08;
+                        }
+                    }
+                }
+            }
+        }
+
+        function powerupCheck() {
+            for (const pickup of powerups) {
+                if (!pickup.active) continue;
+                const d = pickup.mesh.position.distanceTo(car.position);
+                if (d < 3.2) {
+                    pickup.active = false;
+                    pickup.mesh.visible = false;
+
+                    if (pickup.type === 'repair') {
+                        state.health = Math.min(100, state.health + 24);
+                    } else if (pickup.type === 'shield') {
+                        state.shieldTimer = 9;
+                    } else if (pickup.type === 'overdrive') {
+                        state.overdriveTimer = 8;
+                        state.boostMeter = 100;
+                    }
+                }
+            }
+        }
+
+        function hazardCheck() {
+            if (state.crashCooldown > 0) return;
+            for (const rock of hazards) {
+                const d = rock.position.distanceTo(car.position);
+                if (d < 2.7) {
+                    applyDamage(18, 'Your car took too many hits from canyon hazards.');
+                    state.speed *= -0.34;
+                    state.crashCooldown = 0.85;
+                    break;
+                }
+            }
+        }
+
+        function updateKens(dt) {
+            for (const ken of kenChasers) {
+                const mesh = ken.mesh;
+                const offsetTarget = car.position.clone();
+                const flankOffset = new THREE.Vector3(
+                    Math.sin(performance.now() * 0.0015 + mesh.position.z * 0.03) * 5,
+                    0,
+                    Math.cos(performance.now() * 0.0013 + mesh.position.x * 0.03) * 5
+                );
+                offsetTarget.add(flankOffset);
+
+                const toPlayer = offsetTarget.sub(mesh.position);
+                toPlayer.y = 0;
+                const dist = toPlayer.length();
+
+                if (dist > 0.001) {
+                    const desiredYaw = Math.atan2(toPlayer.x, toPlayer.z);
+                    const yawDiff = THREE.MathUtils.euclideanModulo(desiredYaw - mesh.rotation.y + Math.PI, Math.PI * 2) - Math.PI;
+                    mesh.rotation.y += THREE.MathUtils.clamp(yawDiff, -ken.turnRate, ken.turnRate);
+                }
+
+                const speedScale = state.bossRunActive ? 1.35 : 1;
+                const chaseSpeed = (ken.speed + THREE.MathUtils.clamp(dist * 0.0018, 0, 0.35)) * speedScale;
+                mesh.translateZ(chaseSpeed * 52 * dt);
+
+                mesh.position.x = THREE.MathUtils.clamp(mesh.position.x, -worldSize + 2, worldSize - 2);
+                mesh.position.z = THREE.MathUtils.clamp(mesh.position.z, -worldSize + 2, worldSize - 2);
+
+                if (dist < 3.4 && ken.strikeCooldown <= 0) {
+                    applyDamage(14, 'Ken racers shut down your escape route.');
+                    state.speed *= 0.55;
+                    ken.strikeCooldown = 1.2;
+
+                    if (state.shieldTimer > 0) {
+                        mesh.translateZ(-6.5);
+                    }
+                }
+
+                if (dist > 85) {
+                    const back = new THREE.Vector3(0, 0, 1).applyQuaternion(car.quaternion).multiplyScalar(18 + Math.random() * 14);
+                    mesh.position.copy(car.position.clone().add(back));
+                }
+
+                if (ken.strikeCooldown > 0) {
+                    ken.strikeCooldown -= dt;
+                }
+            }
+        }
+
+        function updatePowerups(t) {
+            powerups.forEach((pickup, i) => {
+                if (!pickup.active) return;
+                pickup.mesh.rotation.x += 0.02;
+                pickup.mesh.rotation.y += 0.03;
+                pickup.mesh.position.y = 3 + Math.sin(t * 0.003 + pickup.phase + i) * 0.6;
+            });
+        }
+
+        function updateBossGate(t) {
+            if (!state.bossRunActive) return;
+
+            gateRing.rotation.z += 0.03;
+            gateCore.material.opacity = 0.55 + Math.sin(t * 0.006) * 0.2;
+
+            const toCar = car.position.clone().sub(hugeKen.position);
+            toCar.y = 0;
+            const distBossToCar = toCar.length();
+
+            if (distBossToCar > 0.001) {
+                const yaw = Math.atan2(toCar.x, toCar.z);
+                hugeKen.rotation.y = THREE.MathUtils.lerp(hugeKen.rotation.y, yaw, 0.04);
+            }
+
+            if (state.bossHp > 0) {
+                const pulse = 0.8 + Math.sin(t * 0.005) * 0.25;
+                hugeKen.scale.setScalar(1 + pulse * 0.02);
+
+                if (distBossToCar < 66) {
+                    const step = toCar.normalize().multiplyScalar((0.19 + (3 - state.bossHp) * 0.03) * 46 * (1 / 60));
+                    hugeKen.position.add(step);
+                    hugeKen.position.x = THREE.MathUtils.clamp(hugeKen.position.x, -worldSize + 14, worldSize - 14);
+                    hugeKen.position.z = THREE.MathUtils.clamp(hugeKen.position.z, -worldSize + 14, worldSize - 14);
+                }
+
+                if (distBossToCar < 13 && state.bossStrikeCooldown <= 0) {
+                    if (state.overdriveTimer > 0) {
+                        state.bossHp -= 1;
+                        state.overdriveTimer = 0;
+                        state.shakeTimer = Math.max(state.shakeTimer, 0.35);
+                        state.shakeStrength = Math.max(state.shakeStrength, 0.95);
+                        hugeKen.position.add(toCar.normalize().multiplyScalar(-10));
+                        if (state.bossHp <= 0) {
+                            state.missionPhase = 'Gate Escape';
+                            gateCore.material.color.setHex(0xcdfad8);
+                            gateCore.material.opacity = 0.88;
+                            state.shakeTimer = 0.55;
+                            state.shakeStrength = 1.45;
+                        }
+                    } else {
+                        applyDamage(30, 'Huge Ken crushed your car before you could break his defense.');
+                        state.shakeTimer = Math.max(state.shakeTimer, 0.5);
+                        state.shakeStrength = Math.max(state.shakeStrength, 1.1);
+                    }
+                    state.bossStrikeCooldown = 1.15;
+                }
+            }
+
+            if (state.bossStrikeCooldown > 0) {
+                state.bossStrikeCooldown -= 1 / 60;
+            }
+
+            const d = bossGate.position.distanceTo(car.position);
+            if (d < 8.5 && state.bossHp <= 0) {
+                openEndScreen('Mission Complete', 'Huge Ken is down. You smashed through the gate and won the canyon raid.');
+            }
+        }
+
+        function updateBossPresentation(dt) {
+            if (state.bossIntroTimer > 0) {
+                state.bossIntroTimer -= dt;
+                if (state.bossIntroTimer <= 0) {
+                    bossIntroEl.classList.add('hidden');
+                }
+            }
+
+            if (state.shakeTimer > 0) {
+                state.shakeTimer -= dt;
+                if (state.shakeTimer <= 0) {
+                    state.shakeTimer = 0;
+                    state.shakeStrength = 0;
+                }
+            }
+        }
+
+        function updateCar(dt) {
+            if (!state.running) return;
+
+            const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(car.quaternion).setY(0).normalize();
+            const right = new THREE.Vector3(1, 0, 0).applyQuaternion(car.quaternion).setY(0).normalize();
+
+            if (isPressed('ArrowUp') || isPressed('KeyW')) {
+                state.speed += state.accel;
+            }
+            if (isPressed('ArrowDown') || isPressed('KeyS')) {
+                state.speed -= state.accel * 0.8;
+            }
+
+            const boosting = isPressed('ShiftLeft') || isPressed('ShiftRight');
+            if (boosting && state.boostMeter > 1) {
+                state.speed += state.accel * 0.045;
+                state.boostMeter -= dt * 30;
+            } else {
+                state.boostMeter = Math.min(100, state.boostMeter + dt * 14);
+            }
+
+            if (state.overdriveTimer > 0) {
+                state.overdriveTimer -= dt;
+                state.speed += state.accel * 0.03;
+            }
+
+            if (state.shieldTimer > 0) {
+                state.shieldTimer -= dt;
+            }
+
+            const maxForwardSpeed = state.overdriveTimer > 0 ? state.maxSpeed * 1.42 : state.maxSpeed;
+            state.speed = THREE.MathUtils.clamp(state.speed, -0.55, maxForwardSpeed);
+            state.speed *= state.drag;
+
+            const steer = (isPressed('ArrowLeft') || isPressed('KeyA') ? 1 : 0) - (isPressed('ArrowRight') || isPressed('KeyD') ? 1 : 0);
+            const turnStrength = state.turnSpeed * THREE.MathUtils.clamp(Math.abs(state.speed) * 1.4, 0.2, 1.7);
+            car.rotation.y += steer * turnStrength;
+
+            if (isPressed('Space') && state.grounded) {
+                state.yVel = 0.34;
+                state.grounded = false;
+            }
+
+            state.yVel -= dt * 0.72;
+            car.position.y += state.yVel;
+            if (car.position.y <= 0.22) {
+                car.position.y = 0.22;
+                state.yVel = 0;
+                state.grounded = true;
+            }
+
+            const move = forward.multiplyScalar(state.speed * 46 * dt);
+            const drift = right.multiplyScalar(steer * Math.abs(state.speed) * 7 * dt);
+            car.position.add(move).add(drift);
+
+            car.position.x = THREE.MathUtils.clamp(car.position.x, -worldSize + 3, worldSize - 3);
+            car.position.z = THREE.MathUtils.clamp(car.position.z, -worldSize + 3, worldSize - 3);
+
+            const wheelSpin = state.speed * 0.48;
+            wheels.forEach((w) => {
+                w.rotation.x -= wheelSpin;
+            });
+
+            glow.intensity = 1 + Math.abs(state.speed) * 0.9;
+
+            if (state.crashCooldown > 0) {
+                state.crashCooldown -= dt;
+            }
+
+            state.timer -= dt;
+            if (state.timer <= 0) {
+                if (state.bossRunActive) {
+                    openEndScreen('Gate Closed', 'The boss gate sealed before you reached it.');
+                } else {
+                    openEndScreen('Time Up', 'The relic storm closed in before you could finish the route.');
+                }
+            }
+
+            collectCheck();
+            powerupCheck();
+            hazardCheck();
+        }
+
+        function updateRelics(t) {
+            relics.forEach((relic, i) => {
+                if (relic.collected) return;
+                relic.mesh.rotation.y += 0.02;
+                relic.mesh.rotation.x += 0.012;
+                relic.mesh.position.y = 2.7 + Math.sin(t * 0.002 + relic.bobPhase + i) * 0.62;
+            });
+        }
+
+        function updateCamera(dt) {
+            const offset = new THREE.Vector3(0, 8 + Math.abs(state.speed) * 2.8, 16 + Math.abs(state.speed) * 8.8);
+            offset.applyQuaternion(car.quaternion);
+            const target = car.position.clone().add(offset);
+            camera.position.lerp(target, 1 - Math.pow(0.02, dt * 60));
+
+            if (state.shakeTimer > 0) {
+                const amplitude = state.shakeStrength * state.shakeTimer * 0.65;
+                camera.position.x += (Math.random() * 2 - 1) * amplitude;
+                camera.position.y += (Math.random() * 2 - 1) * amplitude * 0.45;
+                camera.position.z += (Math.random() * 2 - 1) * amplitude;
+            }
+
+            const lookAt = car.position.clone().add(new THREE.Vector3(0, 2.1, 0));
+            camera.lookAt(lookAt);
+        }
+
+        const clock = new THREE.Clock();
+
+        function loop() {
+            const dt = Math.min(clock.getDelta(), 0.032);
+            const elapsed = performance.now();
+
+            updateCar(dt);
+            updateKens(dt);
+            updateRelics(elapsed);
+            updatePowerups(elapsed);
+            updateBossGate(elapsed);
+            updateBossPresentation(dt);
+            updateCamera(dt);
+            updateHud();
+
+            renderer.render(scene, camera);
+            requestAnimationFrame(loop);
+        }
+
+        document.getElementById('start-btn').addEventListener('click', () => {
+            document.getElementById('banner').classList.add('hidden');
+            softReset();
+        });
+
+        document.getElementById('restart-btn').addEventListener('click', () => {
+            document.getElementById('end-screen').classList.add('hidden');
+            softReset();
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        spawnRelics();
+        spawnHazards();
+        spawnKens();
+        spawnPowerups();
+        updateHud();
+        loop();
+    </script>
+</body>
+</html>

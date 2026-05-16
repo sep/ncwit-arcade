@@ -40,5 +40,12 @@ const GAMES = [
     "path": "games/valerie/index.html",
     "genre": "Angry Birds",
     "color": "Monochrome"
+  },
+  {
+    "title": "Barbie Road Raider",
+    "author": "Copilot x Barbie Racer",
+    "path": "games/barbie-road-raider/index.html",
+    "genre": "Action Driver",
+    "color": "Sunset"
   }
 ];
