@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Geometry Run</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+      font-family: monospace;
+    }
+    canvas {
+      display: block;
+      border: 2px solid rgba(0,255,255,0.4);
+      box-shadow: 0 0 40px rgba(0,255,255,0.25);
+    }
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+// ── GEOMETRY RUN ── Geometry Dash style ──────────────────────────────────
+
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+canvas.width  = 800;
+canvas.height = 400;
+const W = 800, H = 400;
+
+const GROUND    = H - 60;   // ground y
+const PSIZE     = 40;       // player size
+const GRAVITY   = 0.55;
+const JUMP_VEL  = -14;
+const PAD_VEL   = -18;
+const ORB_VEL   = -15;
+const SPEED     = 5;
+const PLAYER_SX = 150;      // player fixed screen-x
+
+// ── AUDIO ────────────────────────────────────────────────────────────────
+let _ac = null;
+function ac() { if (!_ac) _ac = new (window.AudioContext || window.webkitAudioContext)(); return _ac; }
+
+function tone(freq, type, t0, dur, vol, freqEnd) {
+  const o = ac().createOscillator(), g = ac().createGain();
+  o.type = type || 'sine';
+  o.connect(g); g.connect(ac().destination);
+  o.frequency.setValueAtTime(freq, t0);
+  if (freqEnd) o.frequency.exponentialRampToValueAtTime(freqEnd, t0 + dur);
+  g.gain.setValueAtTime(vol, t0);
+  g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  o.start(t0); o.stop(t0 + dur + 0.01);
+}
+
+function sndJump()  { const t = ac().currentTime; tone(330,'square',t,0.08,0.25,660); }
+function sndPad()   { const t = ac().currentTime; tone(440,'square',t,0.12,0.3,880); }
+function sndOrb()   { const t = ac().currentTime; tone(660,'sine',t,0.15,0.35,1320); }
+function sndDeath() { const t = ac().currentTime; tone(300,'sawtooth',t,0.35,0.4,40); }
+function sndWin()   { const t = ac().currentTime; [523,659,784,1047].forEach((f,i)=>tone(f,'sine',t+i*0.14,0.3,0.3)); }
+
+// ── LEVEL ────────────────────────────────────────────────────────────────
+// All x = world-space.  Player world-x = cameraX + PLAYER_SX.
+// spike    : triangle on ground (40px wide, 40px tall)
+// pad      : jump pad on ground (auto-boost on contact)
+// orb      : floating orb (Space/click while near for boost)
+// platform : elevated block { x, y, w, h }
+// finish   : win portal
+
+const LEVEL = [
+  // ── Warm-up: single spikes ──
+  { type:'spike',    x: 650 },
+  { type:'spike',    x: 900 },
+  { type:'spike',    x: 1060 },
+
+  // ── Jump pad over 3-spike cluster ──
+  { type:'pad',      x: 1280 },
+  { type:'spike',    x: 1400 },
+  { type:'spike',    x: 1440 },
+  { type:'spike',    x: 1480 },
+
+  // ── Platform over spike pit ──
+  { type:'spike',    x: 1760 },
+  { type:'spike',    x: 1800 },
+  { type:'spike',    x: 1840 },
+  { type:'spike',    x: 1880 },
+  { type:'platform', x: 1740, y: GROUND - 100, w: 200, h: 18 },
+
+  // ── Orb challenge: orb near ground, spike just after ──
+  { type:'orb',      x: 2200, y: GROUND - 32 },
+  { type:'spike',    x: 2310 },
+  { type:'spike',    x: 2350 },
+
+  // ── Mixed: spikes + pad ──
+  { type:'spike',    x: 2580 },
+  { type:'spike',    x: 2620 },
+  { type:'pad',      x: 2810 },
+  { type:'spike',    x: 2930 },
+  { type:'spike',    x: 2970 },
+  { type:'spike',    x: 3010 },
+
+  // ── Final gauntlet: platform + orb ──
+  { type:'spike',    x: 3210 },
+  { type:'spike',    x: 3250 },
+  { type:'platform', x: 3190, y: GROUND - 100, w: 130, h: 18 },
+  { type:'orb',      x: 3430, y: GROUND - 32 },
+  { type:'spike',    x: 3550 },
+  { type:'spike',    x: 3590 },
+  { type:'spike',    x: 3630 },
+
+  { type:'finish',   x: 3860 },
+];
+
+// ── STATE ────────────────────────────────────────────────────────────────
+let state       = 'title';   // title | playing | dead | win
+let cameraX     = 0;
+let playerY     = GROUND - PSIZE;
+let playerVelY  = 0;
+let onGround    = false;
+let playerAngle = 0;
+let deathTimer  = 0;
+let usedOrbs    = new Set();
+let winRestartBound = false;
+
+const STARS = Array.from({ length: 90 }, () => ({
+  x: Math.random() * W,
+  y: Math.random() * (GROUND - 10),
+  r: Math.random() * 1.5 + 0.3,
+  spd: Math.random() * 0.5 + 0.15,
+}));
+
+// ── HELPERS ──────────────────────────────────────────────────────────────
+function wx2sx(wx) { return wx - cameraX; }
+
+function playerRect() {
+  const m = 5;
+  return { x: PLAYER_SX + m, y: playerY + m, w: PSIZE - m*2, h: PSIZE - m*2 };
+}
+
+function overlap(a, b) {
+  return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y;
+}
+
+function spikeHit(pr, sx) {
+  return pr.x < sx+36 && pr.x+pr.w > sx+4 && pr.y+pr.h > GROUND - 36;
+}
+
+// ── RESET / ACTIONS ──────────────────────────────────────────────────────
+function resetGame() {
+  cameraX=0; playerY=GROUND-PSIZE; playerVelY=0;
+  onGround=true; playerAngle=0; deathTimer=0;
+  usedOrbs=new Set(); state='playing';
+}
+
+function doJump() {
+  if (onGround) { playerVelY=JUMP_VEL; onGround=false; sndJump(); return true; }
+  return false;
+}
+
+function tryOrb() {
+  for (let i=0; i<LEVEL.length; i++) {
+    const obj=LEVEL[i];
+    if (obj.type!=='orb' || usedOrbs.has(i)) continue;
+    const sx=wx2sx(obj.x);
+    if (Math.hypot(PLAYER_SX+PSIZE/2-sx, playerY+PSIZE/2-obj.y) < 65) {
+      usedOrbs.add(i); playerVelY=ORB_VEL; onGround=false; sndOrb(); return true;
+    }
+  }
+  return false;
+}
+
+function handleAction() {
+  if (state==='title') { resetGame(); return; }
+  if (state==='dead')  { if (deathTimer>25) resetGame(); return; }
+  if (state==='win')   { resetGame(); return; }
+  if (!doJump()) tryOrb();
+}
+
+document.addEventListener('keydown', e=>{
+  if (e.code==='Space'||e.code==='ArrowUp') { e.preventDefault(); handleAction(); }
+});
+canvas.addEventListener('click', ()=>handleAction());
+canvas.addEventListener('touchstart', e=>{ e.preventDefault(); handleAction(); }, {passive:false});
+
+// ── UPDATE ───────────────────────────────────────────────────────────────
+function update() {
+  if (state!=='playing') { if (state==='dead') deathTimer++; return; }
+
+  cameraX += SPEED;
+  playerVelY += GRAVITY;
+  playerY    += playerVelY;
+
+  if (!onGround) {
+    playerAngle += 0.085;
+  } else {
+    playerAngle = Math.round(playerAngle/(Math.PI/2))*(Math.PI/2);
+  }
+
+  onGround = false;
+  if (playerY >= GROUND - PSIZE) {
+    playerY=GROUND-PSIZE; playerVelY=0; onGround=true;
+  }
+
+  const pr = playerRect();
+
+  for (let i=0; i<LEVEL.length; i++) {
+    const obj=LEVEL[i], sx=wx2sx(obj.x);
+    if (sx>W+120 || sx<-200) continue;
+
+    if (obj.type==='spike' && spikeHit(pr,sx)) { die(); return; }
+
+    if (obj.type==='pad') {
+      if (overlap(pr,{x:sx,y:GROUND-14,w:54,h:14})) {
+        playerVelY=PAD_VEL; onGround=false; sndPad();
+      }
+    }
+
+    if (obj.type==='platform') {
+      const psx=wx2sx(obj.x);
+      const pl={x:psx,y:obj.y,w:obj.w,h:obj.h};
+      if (overlap(pr,pl)) {
+        const prevBot=(playerY-playerVelY)+PSIZE;
+        if (prevBot<=obj.y+4 && playerVelY>=0) {
+          playerY=obj.y-PSIZE; playerVelY=0; onGround=true;
+        }
+      }
+    }
+
+    if (obj.type==='finish' && sx < PLAYER_SX+PSIZE) { win(); return; }
+  }
+
+  if (playerY > H+50) die();
+}
+
+function die() { state='dead'; deathTimer=0; sndDeath(); }
+function win() { state='win'; sndWin(); }
+
+// ── DRAW ─────────────────────────────────────────────────────────────────
+function drawBG() {
+  const sky=ctx.createLinearGradient(0,0,0,GROUND);
+  sky.addColorStop(0,'#04001a'); sky.addColorStop(1,'#0a003a');
+  ctx.fillStyle=sky; ctx.fillRect(0,0,W,GROUND);
+
+  ctx.strokeStyle='rgba(60,0,180,0.18)'; ctx.lineWidth=1;
+  const gs=60, ox=cameraX%gs;
+  for (let x=-ox;x<W+gs;x+=gs) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,GROUND); ctx.stroke(); }
+  for (let y=0;y<GROUND;y+=gs) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+  for (const s of STARS) {
+    s.x-=s.spd; if (s.x<0){s.x=W;s.y=Math.random()*(GROUND-10);}
+    ctx.fillStyle=`rgba(255,255,255,${0.4+s.r*0.2})`;
+    ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fill();
+  }
+}
+
+function drawGround() {
+  ctx.shadowColor='#0ff'; ctx.shadowBlur=18;
+  ctx.fillStyle='#0ff'; ctx.fillRect(0,GROUND,W,2); ctx.shadowBlur=0;
+  const gf=ctx.createLinearGradient(0,GROUND,0,H);
+  gf.addColorStop(0,'#08003a'); gf.addColorStop(1,'#000');
+  ctx.fillStyle=gf; ctx.fillRect(0,GROUND+2,W,H-GROUND-2);
+  ctx.fillStyle='rgba(0,80,200,0.13)';
+  const tw=60,ox2=cameraX%tw;
+  for (let x=-ox2;x<W;x+=tw) ctx.fillRect(x+1,GROUND+4,tw-2,18);
+}
+
+function drawPlayer() {
+  ctx.save();
+  ctx.translate(PLAYER_SX+PSIZE/2, playerY+PSIZE/2);
+  ctx.rotate(playerAngle);
+  ctx.shadowColor='#f0f'; ctx.shadowBlur=22;
+  const bg=ctx.createLinearGradient(-PSIZE/2,-PSIZE/2,PSIZE/2,PSIZE/2);
+  bg.addColorStop(0,'#ff00ff'); bg.addColorStop(1,'#0088ff');
+  ctx.fillStyle=bg; ctx.fillRect(-PSIZE/2,-PSIZE/2,PSIZE,PSIZE);
+  ctx.strokeStyle='rgba(255,255,255,0.7)'; ctx.lineWidth=2;
+  ctx.strokeRect(-PSIZE/2+5,-PSIZE/2+5,PSIZE-10,PSIZE-10);
+  ctx.shadowBlur=0;
+  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(8,-5,5,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#111'; ctx.beginPath(); ctx.arc(9,-5,2.5,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+function drawSpike(sx) {
+  ctx.save();
+  ctx.shadowColor='#f44'; ctx.shadowBlur=12;
+  const g=ctx.createLinearGradient(sx+20,GROUND-40,sx+20,GROUND);
+  g.addColorStop(0,'#ff2200'); g.addColorStop(1,'#ff6600');
+  ctx.fillStyle=g;
+  ctx.beginPath(); ctx.moveTo(sx,GROUND); ctx.lineTo(sx+40,GROUND); ctx.lineTo(sx+20,GROUND-40); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=1; ctx.stroke();
+  ctx.restore();
+}
+
+function drawPad(sx) {
+  ctx.save(); ctx.shadowColor='#0f6'; ctx.shadowBlur=18;
+  ctx.fillStyle='#00ff88'; ctx.fillRect(sx,GROUND-14,54,14);
+  ctx.fillStyle='#fff';
+  ctx.beginPath(); ctx.moveTo(sx+27,GROUND-33); ctx.lineTo(sx+16,GROUND-16); ctx.lineTo(sx+38,GROUND-16); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+function drawOrb(sx, sy, used) {
+  if (used) return;
+  const t=Date.now()/500, r=15+Math.sin(t)*3;
+  ctx.save(); ctx.shadowColor='#ff0'; ctx.shadowBlur=28;
+  const gr=ctx.createRadialGradient(sx,sy,2,sx,sy,r);
+  gr.addColorStop(0,'#ffffaa'); gr.addColorStop(0.5,'#ffcc00'); gr.addColorStop(1,'rgba(255,200,0,0)');
+  ctx.fillStyle=gr; ctx.beginPath(); ctx.arc(sx,sy,r,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#ffcc00'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(sx,sy,13,0,Math.PI*2); ctx.stroke();
+  ctx.restore();
+}
+
+function drawPlatform(sx,sy,w,h) {
+  ctx.save(); ctx.shadowColor='#48f'; ctx.shadowBlur=14;
+  const pg=ctx.createLinearGradient(sx,sy,sx,sy+h);
+  pg.addColorStop(0,'#3366dd'); pg.addColorStop(1,'#112266');
+  ctx.fillStyle=pg; ctx.fillRect(sx,sy,w,h);
+  ctx.strokeStyle='#88ccff'; ctx.lineWidth=2; ctx.strokeRect(sx,sy,w,h);
+  ctx.restore();
+}
+
+function drawFinish(sx) {
+  const t=Date.now()/400, cy=GROUND-65;
+  ctx.save(); ctx.shadowColor='#0ff'; ctx.shadowBlur=35+Math.sin(t)*12;
+  ctx.strokeStyle='#0ff'; ctx.lineWidth=4; ctx.beginPath(); ctx.arc(sx+22,cy,38,0,Math.PI*2); ctx.stroke();
+  const ig=ctx.createRadialGradient(sx+22,cy,4,sx+22,cy,33);
+  ig.addColorStop(0,'rgba(0,255,255,0.75)'); ig.addColorStop(1,'rgba(0,255,255,0)');
+  ctx.fillStyle=ig; ctx.beginPath(); ctx.arc(sx+22,cy,33,0,Math.PI*2); ctx.fill();
+  ctx.shadowBlur=0; ctx.fillStyle='#fff'; ctx.font='bold 13px monospace'; ctx.textAlign='center';
+  ctx.fillText('FINISH',sx+22,GROUND-112); ctx.restore();
+}
+
+function drawHUD() {
+  const prog=Math.min(cameraX/(3860-650),1);
+  ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fillRect(20,14,204,16);
+  const bar=ctx.createLinearGradient(20,0,224,0);
+  bar.addColorStop(0,'#ff00ff'); bar.addColorStop(1,'#00ffff');
+  ctx.fillStyle=bar; ctx.fillRect(20,14,204*prog,16);
+  ctx.strokeStyle='rgba(255,255,255,0.3)'; ctx.lineWidth=1; ctx.strokeRect(20,14,204,16);
+  ctx.fillStyle='#fff'; ctx.font='11px monospace'; ctx.textAlign='left'; ctx.fillText(Math.round(prog*100)+'%',232,26);
+  ctx.fillStyle='rgba(255,255,255,0.28)'; ctx.font='12px monospace'; ctx.textAlign='right';
+  ctx.fillText('SPACE / CLICK = Jump  |  Near ORB = click for boost',W-14,28);
+}
+
+function drawTitle() {
+  ctx.fillStyle='#04001a'; ctx.fillRect(0,0,W,H);
+  const t=Date.now()/1200;
+  for (let i=0;i<8;i++) {
+    const bx=((i*95+t*40)%(W+80))-40;
+    ctx.save(); ctx.globalAlpha=0.07; ctx.fillStyle=`hsl(${i*40},100%,60%)`;
+    ctx.translate(bx,H/2-30+Math.sin(t+i)*60); ctx.rotate(t+i);
+    ctx.fillRect(-20,-20,40,40); ctx.restore();
+  }
+  ctx.save(); ctx.shadowColor='#f0f'; ctx.shadowBlur=50;
+  ctx.fillStyle='#fff'; ctx.font='bold 62px monospace'; ctx.textAlign='center'; ctx.fillText('GEOMETRY RUN',W/2,H/2-50); ctx.restore();
+  ctx.fillStyle='#0ff'; ctx.font='21px monospace'; ctx.textAlign='center'; ctx.fillText('Click or press SPACE to start',W/2,H/2+20);
+  ctx.fillStyle='rgba(200,200,255,0.45)'; ctx.font='13px monospace';
+  ctx.fillText('Jump spikes  ·  Land on platforms  ·  Click ORBS for a boost  ·  Reach the portal!',W/2,H/2+62);
+}
+
+function drawDead() {
+  ctx.fillStyle='rgba(180,0,0,0.22)'; ctx.fillRect(0,0,W,H);
+  ctx.save(); ctx.shadowColor='#f00'; ctx.shadowBlur=35;
+  ctx.fillStyle='#fff'; ctx.font='bold 52px monospace'; ctx.textAlign='center'; ctx.fillText('YOU DIED',W/2,H/2-10); ctx.restore();
+  ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.font='17px monospace'; ctx.textAlign='center'; ctx.fillText('Click or SPACE to try again',W/2,H/2+38);
+}
+
+function drawWin() {
+  ctx.fillStyle='rgba(0,10,40,0.88)'; ctx.fillRect(0,0,W,H);
+  ctx.save(); ctx.shadowColor='#0ff'; ctx.shadowBlur=55;
+  ctx.fillStyle='#fff'; ctx.font='bold 58px monospace'; ctx.textAlign='center'; ctx.fillText('YOU WIN!',W/2,H/2-30); ctx.restore();
+  ctx.fillStyle=`hsl(${(Date.now()/10)%360},100%,70%)`; ctx.font='23px monospace'; ctx.textAlign='center'; ctx.fillText('Level Complete!  \uD83C\uDF89',W/2,H/2+24);
+  ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.font='14px monospace'; ctx.fillText('Click or SPACE to play again',W/2,H/2+65);
+}
+
+// ── MAIN LOOP ────────────────────────────────────────────────────────────
+function frame() {
+  update();
+  ctx.clearRect(0,0,W,H);
+  if (state==='title') { drawTitle(); requestAnimationFrame(frame); return; }
+  drawBG(); drawGround();
+  for (let i=0;i<LEVEL.length;i++) {
+    const obj=LEVEL[i], sx=wx2sx(obj.x);
+    if (sx>W+150||sx<-160) continue;
+    if (obj.type==='spike')    drawSpike(sx);
+    if (obj.type==='pad')      drawPad(sx);
+    if (obj.type==='orb')      drawOrb(sx,obj.y,usedOrbs.has(i));
+    if (obj.type==='platform') drawPlatform(wx2sx(obj.x),obj.y,obj.w,obj.h);
+    if (obj.type==='finish')   drawFinish(sx);
+  }
+  drawPlayer(); drawHUD();
+  if (state==='dead') drawDead();
+  if (state==='win')  drawWin();
+  requestAnimationFrame(frame);
+}
+
+frame();
+</script>
+</body>
+</html>
