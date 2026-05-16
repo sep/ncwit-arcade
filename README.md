@@ -83,7 +83,3 @@ After your game is generated, try asking Copilot:
 - **GitHub Copilot** — agentic AI coding assistant
 
 
-<<<<<<< Updated upstream
-=======
-
->>>>>>> Stashed changes
