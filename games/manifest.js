@@ -49,6 +49,7 @@ const GAMES = [
     "color": "Sunset"
   },
   {
+<<<<<<< Updated upstream
     "title": "The Forest",
     "author": "prisha and aarohi",
     "path": "games/prisha-and-aarohi/index.html",
@@ -61,5 +62,12 @@ const GAMES = [
     "path": "games/marvel-infinity-run/index.html",
     "genre": "Space Chase",
     "color": "Neon Cyber"
+=======
+    "title": "Wholesome Cat Boxing Simulator",
+    "author": "Annmarie Lee",
+    "path": "games/annmarie-lee/index.html",
+    "genre": "Cat Combo Fighter",
+    "color": "Sunset"
+>>>>>>> Stashed changes
   }
 ];

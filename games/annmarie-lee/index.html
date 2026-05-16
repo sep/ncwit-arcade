@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wholesome Cat Boxing Simulator</title>
+  <style>
+    :root {
+      --sky-top: #ffe7b8;
+      --sky-bottom: #ffc3a6;
+      --ring: #fef8ea;
+      --rope: #ff8f6b;
+      --ink: #3d2b2f;
+      --panel: rgba(255, 248, 231, 0.85);
+      --accent: #1f6feb;
+      --good: #3fb950;
+      --warn: #f59f00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Trebuchet MS", "Verdana", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 20% 10%, rgba(255, 255, 255, 0.6), transparent 45%),
+        linear-gradient(180deg, var(--sky-top), var(--sky-bottom));
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #ui {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+      padding: 12px;
+    }
+
+    #hud {
+      max-width: 920px;
+      margin: 0 auto;
+      background: var(--panel);
+      border: 2px solid rgba(61, 43, 47, 0.2);
+      border-radius: 14px;
+      padding: 10px 12px;
+      box-shadow: 0 8px 28px rgba(61, 43, 47, 0.2);
+    }
+
+    #hudTop {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-weight: 700;
+    }
+
+    #bars {
+      margin-top: 10px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 130px 1fr;
+      gap: 8px;
+      align-items: center;
+      font-size: 0.92rem;
+    }
+
+    .bar {
+      height: 12px;
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid rgba(61, 43, 47, 0.25);
+      background: rgba(255, 255, 255, 0.75);
+    }
+
+    .fill {
+      height: 100%;
+      width: 100%;
+      transition: width 0.12s linear;
+    }
+
+    #playerFill { background: linear-gradient(90deg, #3fb950, #98df8a); }
+    #enemyFill { background: linear-gradient(90deg, #ff7b72, #f85149); }
+
+    #comboBox {
+      max-width: 920px;
+      margin: 10px auto 0;
+      background: var(--panel);
+      border: 2px dashed rgba(61, 43, 47, 0.3);
+      border-radius: 14px;
+      padding: 10px 12px;
+      text-align: center;
+      font-weight: 700;
+    }
+
+    #comboText {
+      font-size: clamp(1rem, 3.2vw, 1.7rem);
+      letter-spacing: 2px;
+      margin-top: 6px;
+      min-height: 2em;
+    }
+
+    #comboTimer {
+      margin-top: 6px;
+      font-size: 0.95rem;
+      color: #8f2a1f;
+      font-weight: 800;
+    }
+
+    .done {
+      color: var(--good);
+      text-decoration: line-through;
+      opacity: 0.8;
+    }
+
+    .current {
+      color: var(--accent);
+      text-decoration: underline;
+    }
+
+    #hint {
+      max-width: 920px;
+      margin: 10px auto 0;
+      text-align: center;
+      font-size: 0.92rem;
+      background: rgba(255, 248, 231, 0.7);
+      border-radius: 12px;
+      padding: 8px;
+    }
+
+    .screen {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 10px;
+      padding: 18px;
+      background: rgba(255, 248, 231, 0.92);
+      pointer-events: auto;
+    }
+
+    .screen h1 {
+      margin: 0;
+      font-size: clamp(1.8rem, 7vw, 3.4rem);
+    }
+
+    .screen p {
+      max-width: 700px;
+      line-height: 1.4;
+      margin: 0;
+    }
+
+    .panel {
+      background: #fff7e4;
+      border: 2px solid rgba(61, 43, 47, 0.2);
+      border-radius: 14px;
+      padding: 14px;
+      width: min(760px, calc(100% - 12px));
+    }
+
+    .action {
+      color: var(--warn);
+      font-weight: 800;
+      animation: pulse 1.2s infinite;
+    }
+
+    #restartBtn {
+      border: 2px solid rgba(61, 43, 47, 0.3);
+      border-radius: 999px;
+      padding: 10px 18px;
+      font-weight: 800;
+      font-size: 1rem;
+      background: #fff;
+      color: var(--ink);
+      cursor: pointer;
+      pointer-events: auto;
+    }
+
+    .hidden { display: none !important; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.45; }
+    }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <div id="hud">
+      <div id="hudTop">
+        <div id="score">Score: 0</div>
+        <div id="status">Press P to start a combo attack</div>
+        <div id="round">Round: 1</div>
+      </div>
+      <div id="bars">
+        <div class="row">
+          <span>Annmarie Cat</span>
+          <div class="bar"><div id="playerFill" class="fill"></div></div>
+        </div>
+        <div class="row">
+          <span>Wild Ring Cat</span>
+          <div class="bar"><div id="enemyFill" class="fill"></div></div>
+        </div>
+      </div>
+    </div>
+    <div id="comboBox">
+      Combo Challenge (press P first):
+      <div id="comboText">Waiting for combo...</div>
+      <div id="comboTimer"></div>
+    </div>
+    <div id="hint">Move with A/D or Left/Right. Press P to attack, then type the random keys in order to land combo shots.</div>
+  </div>
+
+  <div id="titleScreen" class="screen">
+    <h1>Wholesome Cat Boxing Simulator</h1>
+    <p>Two 2D cats leap into a playful ring showdown. Nobody gets hurt badly. If a cat loses stamina, it happily returns to the wild for a nap.</p>
+    <div class="panel">
+      <p><strong>How to play:</strong> Stay close, press <strong>P</strong> to begin an attack combo, then hit the random letters/numbers/characters shown on screen in the right order.</p>
+      <p><strong>Controls:</strong> Move with <strong>A/D</strong> or <strong>Arrow keys</strong>. Use <strong>P</strong> to start combo attacks.</p>
+      <p><strong>Goal:</strong> Win 3 rounds by out-meowing and out-comboing the other cat.</p>
+    </div>
+    <p class="action">Press SPACE or ENTER to start</p>
+  </div>
+
+  <div id="gameOverScreen" class="screen hidden">
+    <h1 id="resultTitle">Round Over</h1>
+    <p id="resultBody">A cat bounced back to the wild!</p>
+    <p id="finalScore">Final score: 0</p>
+    <button id="restartBtn">Play Again</button>
+  </div>
+
+  <canvas id="gameCanvas"></canvas>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const ui = {
+      score: document.getElementById('score'),
+      status: document.getElementById('status'),
+      round: document.getElementById('round'),
+      playerFill: document.getElementById('playerFill'),
+      enemyFill: document.getElementById('enemyFill'),
+      comboText: document.getElementById('comboText'),
+      comboTimer: document.getElementById('comboTimer'),
+      titleScreen: document.getElementById('titleScreen'),
+      gameOverScreen: document.getElementById('gameOverScreen'),
+      resultTitle: document.getElementById('resultTitle'),
+      resultBody: document.getElementById('resultBody'),
+      finalScore: document.getElementById('finalScore')
+    };
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function meowTone(baseFreq = 420) {
+      if (audioCtx.state !== 'running') return;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(baseFreq, audioCtx.currentTime);
+      osc.frequency.linearRampToValueAtTime(baseFreq * 0.6, audioCtx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.15);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.16);
+    }
+
+    const keys = { left: false, right: false };
+    const ring = { x: 0, y: 0, w: 0, h: 0 };
+
+    const game = {
+      state: 'title',
+      score: 0,
+      round: 1,
+      level: 1,
+      roundsToWin: 3,
+      playerWins: 0,
+      enemyWins: 0,
+      comboActive: false,
+      comboPrompt: [],
+      comboIndex: 0,
+      comboWindow: 0,
+      lastTime: performance.now(),
+      messageTimer: 0,
+      message: '',
+      enemyAttackTimer: 1.6,
+      dramaFlash: 0
+    };
+
+    const chars = ['A', 'S', 'D', 'F', 'J', 'K', '1', '2', '3', '4', '!', '?', '#'];
+
+    const player = {
+      name: 'Annmarie Cat',
+      x: 260,
+      y: 0,
+      baseY: 0,
+      vx: 0,
+      stamina: 100,
+      attackTimer: 0,
+      attackFromX: 0,
+      attackToX: 0,
+      meowTextTimer: 0
+    };
+
+    const enemy = {
+      name: 'Wild Ring Cat',
+      x: 860,
+      y: 0,
+      baseY: 0,
+      vx: 0,
+      stamina: 100,
+      attackTimer: 0,
+      attackFromX: 0,
+      attackToX: 0,
+      meowTextTimer: 0
+    };
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      ring.w = Math.min(940, canvas.width - 60);
+      ring.h = Math.min(380, canvas.height * 0.46);
+      ring.x = (canvas.width - ring.w) / 2;
+      ring.y = canvas.height - ring.h - 40;
+      player.baseY = ring.y + ring.h - 56;
+      enemy.baseY = ring.y + ring.h - 56;
+      if (game.state === 'title') {
+        player.x = ring.x + ring.w * 0.25;
+        enemy.x = ring.x + ring.w * 0.75;
+      }
+    }
+
+    function randomPrompt(length) {
+      const out = [];
+      for (let i = 0; i < length; i++) {
+        out.push(chars[(Math.random() * chars.length) | 0]);
+      }
+      return out;
+    }
+
+    function startCombo() {
+      if (game.comboActive || game.state !== 'playing' || player.attackTimer > 0) return;
+      const baseLen = 3 + ((Math.random() * 2) | 0);
+      const roundBonus = Math.floor((game.round - 1) / 3);
+      const len = baseLen + roundBonus;
+      game.comboPrompt = randomPrompt(len);
+      game.comboIndex = 0;
+      game.comboWindow = 10;
+      game.comboActive = true;
+      game.dramaFlash = 10;
+      ui.status.textContent = 'Bullet-time combo. Type fast before 10 seconds ends!';
+      meowTone(560);
+    }
+
+    function launchPlayerAttack(power) {
+      const distance = Math.abs(player.x - enemy.x);
+      const closeEnough = distance < 190;
+      player.attackTimer = 0.46;
+      player.attackFromX = player.x;
+      player.attackToX = closeEnough ? player.x + Math.min(85, distance * 0.5) : player.x + 35;
+      player.meowTextTimer = 0.4;
+      meowTone(460 + power * 18);
+
+      if (closeEnough) {
+        const damage = Math.min(26, 8 + power * 5);
+        enemy.stamina = Math.max(0, enemy.stamina - damage);
+        game.score += 30 + power * 20;
+        game.message = 'Combo landed. MEOW!';
+      } else {
+        game.score += 8;
+        game.message = 'Too far. Close in before your combo.';
+      }
+      game.messageTimer = 1.2;
+    }
+
+    function enemyAttack() {
+      if (enemy.attackTimer > 0 || game.state !== 'playing') return;
+      const distance = Math.abs(player.x - enemy.x);
+      if (distance > 220) return;
+      enemy.attackTimer = 0.5;
+      enemy.attackFromX = enemy.x;
+      enemy.attackToX = enemy.x - Math.min(80, distance * 0.45);
+      enemy.meowTextTimer = 0.4;
+      meowTone(330);
+
+      const dodgeBonus = keys.left || keys.right;
+      const damage = dodgeBonus ? 5 : 11;
+      player.stamina = Math.max(0, player.stamina - damage);
+      game.message = dodgeBonus ? 'You softened the hit by moving.' : 'Wild Ring Cat landed a bop.';
+      game.messageTimer = 1.1;
+    }
+
+    const spectators = [
+      { x: 0.12, y: 0.15, color: '#ff9999', accent: '#ffc3a6', name: 'top-left' },
+      { x: 0.5, y: -0.08, color: '#ffcc99', accent: '#ff99cc', name: 'top-center' },
+      { x: 0.88, y: 0.12, color: '#99ccff', accent: '#ffcc99', name: 'top-right' },
+      { x: -0.02, y: 0.5, color: '#cc99ff', accent: '#99ff99', name: 'left' },
+      { x: 1.02, y: 0.48, color: '#99ffcc', accent: '#ff99ff', name: 'right' },
+      { x: 0.18, y: 1.1, color: '#ffffcc', accent: '#cc99ff', name: 'bottom-left' },
+      { x: 0.82, y: 1.08, color: '#ccffcc', accent: '#ffcccc', name: 'bottom-right' },
+    ];
+
+    function drawSpectator(spec, now) {
+      const posX = ring.x + ring.w * spec.x;
+      const posY = ring.y + ring.h * spec.y;
+      const cheerPhase = (now * 0.003 + spec.name.charCodeAt(0) * 0.1) % (Math.PI * 2);
+      const bobY = Math.sin(cheerPhase) * 4;
+      const waveX = Math.cos(cheerPhase) * 2;
+
+      ctx.save();
+      ctx.translate(posX + waveX, posY + bobY);
+      ctx.scale(0.65, 0.65);
+
+      ctx.fillStyle = spec.color;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 36, 28, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(-20, -18);
+      ctx.lineTo(-8, -42);
+      ctx.lineTo(0, -16);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(4, -16);
+      ctx.lineTo(18, -42);
+      ctx.lineTo(24, -16);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = spec.accent;
+      ctx.beginPath();
+      ctx.arc(16, -2, 10, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(10, -10, 5, 0, Math.PI * 2);
+      ctx.arc(-4, -10, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#222';
+      ctx.beginPath();
+      ctx.arc(11, -10, 2, 0, Math.PI * 2);
+      ctx.arc(-3, -10, 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#3d2b2f';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-28, -4);
+      ctx.quadraticCurveTo(-52, -24, -62, -2);
+      ctx.stroke();
+
+      ctx.fillStyle = '#fff1f1';
+      ctx.beginPath();
+      ctx.arc(0, -2, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+
+      ctx.save();
+      ctx.fillStyle = 'rgba(255, 200, 100, 0.5)';
+      ctx.font = '600 10px Trebuchet MS';
+      ctx.textAlign = 'center';
+      const cheerPhase2 = (now * 0.004 + spec.name.charCodeAt(0) * 0.15) % (Math.PI * 2);
+      if (Math.sin(cheerPhase2) > 0.3) {
+        ctx.fillText('MEOW!', posX, posY - 50);
+      }
+      ctx.restore();
+    }
+
+    function drawRing() {
+      ctx.save();
+
+      ctx.fillStyle = '#e8dcc9';
+      ctx.fillRect(ring.x - 20, ring.y + ring.h - 12, ring.w + 40, 24);
+
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ring');
+      ctx.fillRect(ring.x, ring.y, ring.w, ring.h);
+
+      ctx.strokeStyle = '#5f4b4f';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(ring.x, ring.y, ring.w, ring.h);
+
+      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--rope');
+      ctx.lineWidth = 3;
+      for (let i = 1; i <= 3; i++) {
+        const y = ring.y + 52 + i * 44;
+        ctx.beginPath();
+        ctx.moveTo(ring.x, y);
+        ctx.lineTo(ring.x + ring.w, y);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = 'rgba(61, 43, 47, 0.15)';
+      ctx.fillRect(ring.x + 16, ring.y + ring.h - 22, ring.w - 32, 14);
+
+      ctx.restore();
+    }
+
+    function drawCat(cat, facingRight, colorMain, colorAccent, meow) {
+      const bodyY = cat.baseY + cat.y;
+      ctx.save();
+      ctx.translate(cat.x, bodyY);
+      if (!facingRight) ctx.scale(-1, 1);
+
+      ctx.fillStyle = colorMain;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 36, 28, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(-20, -18);
+      ctx.lineTo(-8, -42);
+      ctx.lineTo(0, -16);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(4, -16);
+      ctx.lineTo(18, -42);
+      ctx.lineTo(24, -16);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = colorAccent;
+      ctx.beginPath();
+      ctx.arc(16, -2, 10, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(10, -10, 5, 0, Math.PI * 2);
+      ctx.arc(-4, -10, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#222';
+      ctx.beginPath();
+      ctx.arc(11, -10, 2, 0, Math.PI * 2);
+      ctx.arc(-3, -10, 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#3d2b2f';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-28, -4);
+      ctx.quadraticCurveTo(-52, -24, -62, -2);
+      ctx.stroke();
+
+      ctx.fillStyle = '#fff1f1';
+      ctx.beginPath();
+      ctx.arc(0, -2, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+
+      if (meow > 0) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.strokeStyle = 'rgba(61, 43, 47, 0.3)';
+        ctx.lineWidth = 2;
+        const bx = cat.x - 30;
+        const by = bodyY - 90;
+        ctx.beginPath();
+        ctx.roundRect(bx, by, 84, 30, 10);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#3d2b2f';
+        ctx.font = '700 14px Trebuchet MS';
+        ctx.fillText('MEOW!', bx + 14, by + 20);
+      }
+    }
+
+    function updateAttackMotion(cat, dt) {
+      if (cat.attackTimer <= 0) {
+        cat.y = Math.sin(performance.now() * 0.01 + cat.x * 0.02) * 3;
+        return;
+      }
+
+      cat.attackTimer = Math.max(0, cat.attackTimer - dt);
+      const t = 1 - cat.attackTimer / 0.5;
+      const swing = Math.sin(Math.min(1, t) * Math.PI);
+      cat.x = cat.attackFromX + (cat.attackToX - cat.attackFromX) * swing;
+      cat.y = -Math.sin(Math.min(1, t) * Math.PI) * 34;
+
+      if (cat.attackTimer === 0) {
+        cat.x = cat.attackFromX;
+        cat.y = 0;
+      }
+    }
+
+    function updateComboDisplay() {
+      if (!game.comboActive) {
+        ui.comboText.textContent = 'Waiting for combo...';
+        ui.comboTimer.textContent = '';
+        return;
+      }
+      const parts = game.comboPrompt.map((char, idx) => {
+        if (idx < game.comboIndex) return '<span class="done">' + char + '</span>';
+        if (idx === game.comboIndex) return '<span class="current">' + char + '</span>';
+        return '<span>' + char + '</span>';
+      });
+      ui.comboText.innerHTML = parts.join(' ');
+      ui.comboTimer.textContent = 'Slow-motion timer: ' + game.comboWindow.toFixed(1) + 's';
+    }
+
+    function updateHud() {
+      ui.score.textContent = 'Score: ' + Math.floor(game.score);
+      ui.round.textContent = 'Level ' + game.level + ' (Round ' + game.round + ') | Wins: ' + game.playerWins + '-' + game.enemyWins + ' (to ' + game.roundsToWin + ')';
+      ui.playerFill.style.width = player.stamina + '%';
+      ui.enemyFill.style.width = enemy.stamina + '%';
+      if (game.messageTimer > 0 && !game.comboActive) {
+        ui.status.textContent = game.message;
+      } else if (game.comboActive) {
+        ui.status.textContent = 'Time is nearly frozen. Type the combo in order!';
+      } else {
+        ui.status.textContent = 'Press P to start a combo attack.';
+      }
+      updateComboDisplay();
+    }
+
+    function resetRound() {
+      player.stamina = 100;
+      enemy.stamina = 100;
+      player.x = ring.x + ring.w * 0.25;
+      enemy.x = ring.x + ring.w * 0.75;
+      player.attackTimer = 0;
+      enemy.attackTimer = 0;
+      game.comboActive = false;
+      game.comboPrompt = [];
+      game.comboIndex = 0;
+      game.comboWindow = 0;
+      game.enemyAttackTimer = 1 + Math.random() * 0.8;
+      game.dramaFlash = 0;
+      game.message = 'New round. Keep it playful and precise.';
+      game.messageTimer = 1.4;
+    }
+
+    function endMatch(playerWon) {
+      game.state = 'gameover';
+      ui.gameOverScreen.classList.remove('hidden');
+      if (playerWon) {
+        ui.resultTitle.textContent = 'Level ' + game.level + ' Champion!';
+        ui.resultBody.textContent = 'The other cat happily trots back to the wild for treats. You advance to Level ' + (game.level + 1) + '!';
+      } else {
+        ui.resultTitle.textContent = 'Wild Cat Wins This Time';
+        ui.resultBody.textContent = 'Your cat takes a break, stretches, and returns to the wild smiling.';
+      }
+      ui.finalScore.textContent = 'Final score: ' + Math.floor(game.score);
+    }
+
+    function startGame() {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      game.state = 'playing';
+      game.score = 0;
+      game.round = 1;
+      game.playerWins = 0;
+      game.enemyWins = 0;
+      if (!game.level) game.level = 1;
+      if (!game.roundsToWin) game.roundsToWin = 3;
+      ui.titleScreen.classList.add('hidden');
+      ui.gameOverScreen.classList.add('hidden');
+      resetRound();
+      updateHud();
+    }
+
+    function handleCombatResult() {
+      if (enemy.stamina <= 0) {
+        game.playerWins += 1;
+        game.score += 150;
+        game.message = 'Wild Ring Cat returns to the wild to rest.';
+        game.messageTimer = 1.8;
+      }
+      if (player.stamina <= 0) {
+        game.enemyWins += 1;
+        game.message = 'Annmarie Cat takes a happy nap break.';
+        game.messageTimer = 1.8;
+      }
+
+      if (enemy.stamina > 0 && player.stamina > 0) return;
+
+      if (game.playerWins >= game.roundsToWin) {
+        game.score += 100 * game.level;
+        endMatch(true);
+        return;
+      }
+      if (game.enemyWins >= game.roundsToWin) {
+        endMatch(false);
+        return;
+      }
+
+      game.round += 1;
+      resetRound();
+    }
+
+    function loop(now) {
+      const dt = Math.min(0.034, (now - game.lastTime) / 1000);
+      game.lastTime = now;
+
+      if (game.state === 'playing') {
+        const margin = 38;
+
+        if (!game.comboActive) {
+          const speed = 260;
+          if (keys.left) player.x -= speed * dt;
+          if (keys.right) player.x += speed * dt;
+
+          const drift = 110;
+          const target = player.x + 120;
+          if (enemy.attackTimer <= 0) {
+            if (enemy.x > target + 12) enemy.x -= drift * dt;
+            if (enemy.x < target - 12) enemy.x += drift * dt;
+          }
+
+          updateAttackMotion(player, dt);
+          updateAttackMotion(enemy, dt);
+
+          game.enemyAttackTimer -= dt;
+          if (game.enemyAttackTimer <= 0) {
+            enemyAttack();
+            game.enemyAttackTimer = Math.max(0.9, 1.9 - game.round * 0.15) + Math.random() * 0.5;
+          }
+        } else {
+          const slowDt = dt * 0.08;
+          const slowDrift = 32;
+          const target = player.x + 120;
+          if (enemy.x > target + 12) enemy.x -= slowDrift * slowDt;
+          if (enemy.x < target - 12) enemy.x += slowDrift * slowDt;
+          updateAttackMotion(enemy, slowDt);
+
+          game.comboWindow -= dt;
+          game.dramaFlash = Math.max(0, game.dramaFlash - dt);
+          if (game.comboWindow <= 0) {
+            game.comboActive = false;
+            game.comboPrompt = [];
+            game.comboIndex = 0;
+            game.message = 'Combo timed out. The ring returns to normal speed.';
+            game.messageTimer = 1.2;
+          }
+        }
+
+        player.x = Math.max(ring.x + margin, Math.min(ring.x + ring.w - margin, player.x));
+        enemy.x = Math.max(ring.x + margin, Math.min(ring.x + ring.w - margin, enemy.x));
+
+        if (game.messageTimer > 0) game.messageTimer -= dt;
+        if (player.meowTextTimer > 0) player.meowTextTimer -= dt;
+        if (enemy.meowTextTimer > 0) enemy.meowTextTimer -= dt;
+
+        handleCombatResult();
+      }
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (let spec of spectators) {
+        drawSpectator(spec, now);
+      }
+      drawRing();
+      drawCat(player, true, '#f4b183', '#7ec8e3', player.meowTextTimer);
+      drawCat(enemy, false, '#b8e986', '#f58ea8', enemy.meowTextTimer);
+
+      if (game.comboActive) {
+        const pulse = 0.18 + Math.abs(Math.sin(now * 0.012)) * 0.16;
+        ctx.fillStyle = 'rgba(67, 15, 12, ' + pulse.toFixed(3) + ')';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 236, 197, 0.92)';
+        ctx.strokeStyle = 'rgba(61, 43, 47, 0.4)';
+        ctx.lineWidth = 3;
+        const boxW = Math.min(560, canvas.width - 30);
+        const boxH = 70;
+        const boxX = (canvas.width - boxW) / 2;
+        const boxY = ring.y - 84;
+        ctx.beginPath();
+        ctx.roundRect(boxX, boxY, boxW, boxH, 12);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#5a1d16';
+        ctx.font = '800 24px Trebuchet MS';
+        ctx.textAlign = 'center';
+        ctx.fillText('BULLET-TIME COMBO', canvas.width / 2, boxY + 30);
+        ctx.font = '700 16px Trebuchet MS';
+        ctx.fillText('Type fast. Ring resumes at 0.0s', canvas.width / 2, boxY + 54);
+        ctx.restore();
+      }
+
+      updateHud();
+      requestAnimationFrame(loop);
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
+      if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
+
+      if (game.state === 'title' && (e.code === 'Space' || e.code === 'Enter')) {
+        startGame();
+        return;
+      }
+      if (game.state === 'gameover' && (e.code === 'Space' || e.code === 'Enter')) {
+        startGame();
+        return;
+      }
+
+      if (game.state !== 'playing') return;
+
+      const key = e.key.length === 1 ? e.key.toUpperCase() : e.key;
+
+      if (key === 'P' && !game.comboActive) {
+        startCombo();
+        return;
+      }
+
+      if (!game.comboActive) return;
+
+      const expected = game.comboPrompt[game.comboIndex];
+      if (key === expected) {
+        game.comboIndex += 1;
+        meowTone(640);
+        if (game.comboIndex >= game.comboPrompt.length) {
+          const power = game.comboPrompt.length;
+          game.comboActive = false;
+          game.comboPrompt = [];
+          game.comboIndex = 0;
+          launchPlayerAttack(power);
+        }
+      } else {
+        game.message = 'Wrong key. Keep typing before time runs out!';
+        game.messageTimer = 0.9;
+        game.comboWindow = Math.max(0.8, game.comboWindow - 1.2);
+        meowTone(250);
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
+      if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
+    });
+
+    document.getElementById('restartBtn').addEventListener('click', () => {
+      if (game.playerWins >= game.roundsToWin) {
+        game.level += 1;
+        game.roundsToWin = 3 + game.level * 2;
+      }
+      startGame();
+    });
+
+    window.addEventListener('resize', resize);
+    resize();
+    resetRound();
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
