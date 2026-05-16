@@ -45,7 +45,14 @@ const GAMES = [
     "title": "Barbie Road Raider",
     "author": "Copilot x Barbie Racer",
     "path": "games/barbie-road-raider/index.html",
-    "genre": "Action Driver",
+  "genre": "Action Driver",
     "color": "Sunset"
+  },
+  {
+    "title": "The Forest",
+    "author": "prisha and aarohi",
+    "path": "games/prisha-and-aarohi/index.html",
+    "genre": "Maze Runner",
+    "color": "Forest"
   }
 ];

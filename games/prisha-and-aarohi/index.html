@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Forest</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        :root {
+            --bg-top: #0f2516;
+            --bg-bottom: #041109;
+            --mist: rgba(181, 227, 168, 0.14);
+            --panel: rgba(7, 24, 11, 0.82);
+            --line: #a7d08d;
+            --accent: #d8f3a2;
+            --gold: #f6d66b;
+            --p1: #7cc86f;
+            --p2: #e8c768;
+            --danger: #ff8461;
+            --text: #eef8df;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background:
+                radial-gradient(circle at top, rgba(119, 182, 92, 0.18), transparent 40%),
+                linear-gradient(180deg, var(--bg-top), var(--bg-bottom));
+            color: var(--text);
+            font-family: Georgia, "Trebuchet MS", serif;
+        }
+
+        body {
+            touch-action: none;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #ui {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #hud {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            display: grid;
+            gap: 8px;
+        }
+
+        .hud-card {
+            min-width: 160px;
+            padding: 10px 14px;
+            border: 1px solid rgba(215, 243, 162, 0.35);
+            border-radius: 14px;
+            background: rgba(9, 28, 14, 0.72);
+            box-shadow: 0 14px 30px rgba(0, 0, 0, 0.22);
+            backdrop-filter: blur(8px);
+        }
+
+        .label {
+            display: block;
+            font-size: 0.75rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: rgba(238, 248, 223, 0.72);
+        }
+
+        .value {
+            display: block;
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--accent);
+            text-shadow: 0 0 16px rgba(215, 243, 162, 0.25);
+        }
+
+        #status {
+            position: absolute;
+            top: 18px;
+            right: 16px;
+            max-width: min(360px, calc(100vw - 32px));
+            padding: 12px 16px;
+            border-radius: 16px;
+            background: rgba(8, 22, 12, 0.68);
+            border: 1px solid rgba(167, 208, 141, 0.3);
+            font-size: 0.95rem;
+            line-height: 1.4;
+            color: rgba(238, 248, 223, 0.92);
+        }
+
+        #controls-hint {
+            position: absolute;
+            left: 50%;
+            bottom: 18px;
+            transform: translateX(-50%);
+            padding: 10px 16px;
+            border-radius: 999px;
+            background: rgba(6, 18, 9, 0.7);
+            border: 1px solid rgba(167, 208, 141, 0.28);
+            color: rgba(238, 248, 223, 0.8);
+            font-size: 0.92rem;
+        }
+
+        .screen {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            padding: 28px;
+            text-align: center;
+            background:
+                radial-gradient(circle at top, rgba(94, 145, 72, 0.22), transparent 30%),
+                linear-gradient(180deg, rgba(5, 16, 9, 0.88), rgba(2, 10, 5, 0.95));
+            z-index: 20;
+            pointer-events: auto;
+        }
+
+        .screen.hidden {
+            display: none;
+        }
+
+        .screen h1 {
+            font-size: clamp(2.8rem, 7vw, 5rem);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--accent);
+            text-shadow: 0 0 24px rgba(215, 243, 162, 0.35);
+        }
+
+        .screen .sub {
+            font-size: clamp(1.05rem, 2.2vw, 1.35rem);
+            color: rgba(238, 248, 223, 0.82);
+            max-width: 760px;
+            line-height: 1.6;
+        }
+
+        .screen .start-text {
+            margin-top: 8px;
+            font-size: 1.15rem;
+            color: var(--gold);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        .screen .final-score {
+            font-size: 1.9rem;
+            color: var(--gold);
+        }
+
+        .screen button {
+            min-height: 44px;
+            padding: 0.95rem 2.3rem;
+            border: 0;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #d4ef9b, #7dbf69);
+            color: #17341b;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 18px 28px rgba(0, 0, 0, 0.25);
+        }
+
+        .credit {
+            margin-top: 8px;
+            color: rgba(238, 248, 223, 0.6);
+            font-size: 0.85rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        #mobile-controls {
+            display: none;
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 15;
+            pointer-events: auto;
+            padding: 18px;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .pad {
+            display: grid;
+            grid-template-columns: repeat(3, 72px);
+            grid-template-rows: repeat(3, 72px);
+            gap: 8px;
+        }
+
+        .touch-btn {
+            min-height: 44px;
+            border-radius: 18px;
+            border: 1px solid rgba(215, 243, 162, 0.35);
+            background: rgba(10, 26, 14, 0.7);
+            color: var(--text);
+            font-size: 1.6rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .touch-btn.active {
+            background: rgba(125, 191, 105, 0.8);
+            color: #122818;
+        }
+
+        #touch-switch {
+            width: 118px;
+            height: 72px;
+            font-size: 0.88rem;
+            text-align: center;
+            line-height: 1.2;
+            padding: 0 10px;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.38; }
+        }
+
+        @media (pointer: coarse), (max-width: 900px) {
+            #mobile-controls {
+                display: flex;
+            }
+
+            #controls-hint {
+                display: none;
+            }
+
+            #status {
+                top: auto;
+                bottom: 170px;
+                right: 12px;
+                left: 12px;
+                max-width: none;
+                font-size: 0.88rem;
+            }
+
+            #hud {
+                top: 12px;
+                left: 12px;
+                right: 12px;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+
+            .hud-card {
+                min-width: 0;
+                padding: 8px 10px;
+            }
+
+            .value {
+                font-size: 1.2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <div id="hud">
+            <div class="hud-card"><span class="label">Score</span><span class="value" id="score">0</span></div>
+            <div class="hud-card"><span class="label">Time</span><span class="value" id="timer">90</span></div>
+            <div class="hud-card"><span class="label">Active Hero</span><span class="value" id="active-player">Prisha</span></div>
+        </div>
+        <div id="status">Guide both knights through the enchanted forest maze. Prisha uses WASD. Aarohi uses the arrow keys. On touch screens, tap Switch Hero and use the forest pad.</div>
+        <div id="controls-hint">Prisha: WASD | Aarohi: Arrow Keys | Reach the gate together before time runs out</div>
+    </div>
+
+    <div id="mobile-controls">
+        <div class="pad">
+            <div></div>
+            <div class="touch-btn" id="touch-up">▲</div>
+            <div></div>
+            <div class="touch-btn" id="touch-left">◀</div>
+            <div class="touch-btn" id="touch-switch">Switch Hero</div>
+            <div class="touch-btn" id="touch-right">▶</div>
+            <div></div>
+            <div class="touch-btn" id="touch-down">▼</div>
+            <div></div>
+        </div>
+    </div>
+
+    <div id="title-screen" class="screen">
+        <h1>The Forest</h1>
+        <p class="sub">A Medieval Fantasy maze challenge in a glowing woodland. Collect ancient wisps for points, keep both heroes moving, and guide them to the rune gate before the timer hits zero.</p>
+        <p class="sub">Multiplayer twist: Prisha moves with WASD, Aarohi moves with the arrow keys. On phones and tablets, switch the active hero and steer with the on-screen pad.</p>
+        <p class="start-text">Press SPACE or Tap to Start</p>
+        <p class="credit">Created for Prisha and Aarohi</p>
+    </div>
+
+    <div id="gameover-screen" class="screen hidden">
+        <h1 id="end-title">Game Over</h1>
+        <p class="final-score" id="final-score">Score: 0</p>
+        <button id="restart-btn">Play Again</button>
+        <p class="credit">The Forest by Prisha and Aarohi</p>
+    </div>
+
+    <script>
+        const CONFIG = {
+            cols: 15,
+            rows: 15,
+            cellSize: 4,
+            timeLimit: 90,
+            playerSpeed: 5.2,
+            playerRadius: 0.58,
+            scorePerWisp: 15,
+            winBonus: 200,
+            forestTop: 0x173b20,
+            forestBottom: 0x06150b,
+            wallColor: 0x617f45,
+            mossColor: 0x39552c,
+            pathColor: 0x304826,
+            torchColor: 0xf6d66b,
+            goalColor: 0x9fe870,
+            p1Color: 0x7cc86f,
+            p2Color: 0xe8c768,
+            particleColor: 0xd9f59f
+        };
+
+        const scoreEl = document.getElementById('score');
+        const timerEl = document.getElementById('timer');
+        const statusEl = document.getElementById('status');
+        const activePlayerEl = document.getElementById('active-player');
+        const titleScreen = document.getElementById('title-screen');
+        const gameoverScreen = document.getElementById('gameover-screen');
+        const endTitleEl = document.getElementById('end-title');
+        const finalScoreEl = document.getElementById('final-score');
+        const restartBtn = document.getElementById('restart-btn');
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(CONFIG.forestTop);
+        scene.fog = new THREE.Fog(CONFIG.forestTop, 18, 86);
+
+        const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 200);
+        camera.position.set(0, 30, 14);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0xe8f6d3, 0.9);
+        scene.add(ambientLight);
+
+        const moonLight = new THREE.DirectionalLight(0xd6f7b0, 0.85);
+        moonLight.position.set(-18, 30, 12);
+        moonLight.castShadow = true;
+        moonLight.shadow.mapSize.set(1024, 1024);
+        scene.add(moonLight);
+
+        const heroGlow = new THREE.PointLight(0xa7d08d, 0.8, 30);
+        scene.add(heroGlow);
+
+        const world = new THREE.Group();
+        scene.add(world);
+
+        const floor = new THREE.Mesh(
+            new THREE.PlaneGeometry(CONFIG.cols * CONFIG.cellSize + 18, CONFIG.rows * CONFIG.cellSize + 18),
+            new THREE.MeshStandardMaterial({
+                color: CONFIG.pathColor,
+                roughness: 0.95,
+                metalness: 0.04
+            })
+        );
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.y = -0.02;
+        floor.receiveShadow = true;
+        world.add(floor);
+
+        const floorGrid = new THREE.GridHelper(CONFIG.cols * CONFIG.cellSize + 6, CONFIG.cols * 2, 0x415d32, 0x284020);
+        floorGrid.position.y = 0.01;
+        world.add(floorGrid);
+
+        const wallGroup = new THREE.Group();
+        const collectibleGroup = new THREE.Group();
+        const particleGroup = new THREE.Group();
+        const decoGroup = new THREE.Group();
+        world.add(wallGroup);
+        world.add(collectibleGroup);
+        world.add(particleGroup);
+        world.add(decoGroup);
+
+        const wallMaterial = new THREE.MeshStandardMaterial({
+            color: CONFIG.wallColor,
+            roughness: 0.85,
+            metalness: 0.08
+        });
+        const stoneMaterial = new THREE.MeshStandardMaterial({
+            color: 0x8ea17f,
+            roughness: 0.88,
+            metalness: 0.05
+        });
+
+        const gameState = {
+            started: false,
+            ended: false,
+            won: false,
+            score: 0,
+            timeLeft: CONFIG.timeLimit,
+            lastFrame: 0,
+            maze: [],
+            openCells: [],
+            goalCell: { col: CONFIG.cols - 2, row: CONFIG.rows - 2 },
+            goalWorld: new THREE.Vector3(),
+            collectibles: [],
+            particles: [],
+            players: [],
+            activeTouchPlayer: 0,
+            touch: { up: false, down: false, left: false, right: false },
+            musicTimer: 0,
+            audioReady: false,
+            pulse: 0
+        };
+
+        let audioCtx = null;
+
+        const pressedKeys = Object.create(null);
+
+        function makeMaterial(color) {
+            return new THREE.MeshStandardMaterial({
+                color,
+                emissive: color,
+                emissiveIntensity: 0.12,
+                roughness: 0.55,
+                metalness: 0.18
+            });
+        }
+
+        function worldFromCell(col, row) {
+            return {
+                x: (col - (CONFIG.cols - 1) / 2) * CONFIG.cellSize,
+                z: (row - (CONFIG.rows - 1) / 2) * CONFIG.cellSize
+            };
+        }
+
+        function cellFromWorld(x, z) {
+            return {
+                col: Math.round(x / CONFIG.cellSize + (CONFIG.cols - 1) / 2),
+                row: Math.round(z / CONFIG.cellSize + (CONFIG.rows - 1) / 2)
+            };
+        }
+
+        function createKnight(primaryColor) {
+            const group = new THREE.Group();
+            const primary = makeMaterial(primaryColor);
+            const silver = makeMaterial(0xd9e1d0);
+            const dark = makeMaterial(0x24331f);
+
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.2, 0.55), primary);
+            body.position.y = 1.35;
+            body.castShadow = true;
+            group.add(body);
+
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.34, 18, 18), silver);
+            head.position.y = 2.2;
+            head.castShadow = true;
+            group.add(head);
+
+            const helmet = new THREE.Mesh(new THREE.ConeGeometry(0.38, 0.55, 8), dark);
+            helmet.position.y = 2.56;
+            helmet.castShadow = true;
+            group.add(helmet);
+
+            const sword = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.05, 0.1), silver);
+            sword.position.set(0.54, 1.2, 0);
+            sword.rotation.z = -0.4;
+            sword.castShadow = true;
+            group.add(sword);
+
+            const shield = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.14, 12), primary);
+            shield.rotation.z = Math.PI / 2;
+            shield.position.set(-0.54, 1.28, 0);
+            shield.castShadow = true;
+            group.add(shield);
+
+            const feet = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.18, 0.42), dark);
+            feet.position.y = 0.65;
+            feet.castShadow = true;
+            group.add(feet);
+
+            return group;
+        }
+
+        function createTree() {
+            const tree = new THREE.Group();
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.34, 2.4, 8), makeMaterial(0x5b3821));
+            trunk.position.y = 1.2;
+            trunk.castShadow = true;
+            tree.add(trunk);
+
+            const crownA = new THREE.Mesh(new THREE.ConeGeometry(1.25, 2.2, 10), makeMaterial(0x3a6c32));
+            crownA.position.y = 3.1;
+            crownA.castShadow = true;
+            tree.add(crownA);
+
+            const crownB = new THREE.Mesh(new THREE.ConeGeometry(0.95, 1.8, 10), makeMaterial(0x5c8a45));
+            crownB.position.y = 4.1;
+            crownB.castShadow = true;
+            tree.add(crownB);
+
+            const lantern = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 10), makeMaterial(0xf6d66b));
+            lantern.position.set(0.45, 2.9, 0);
+            tree.add(lantern);
+
+            return tree;
+        }
+
+        function createTorch() {
+            const torch = new THREE.Group();
+            const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 1.5, 8), makeMaterial(0x5b3821));
+            post.position.y = 0.75;
+            post.castShadow = true;
+            torch.add(post);
+
+            const flame = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.42, 8), makeMaterial(0xf6d66b));
+            flame.position.y = 1.65;
+            torch.add(flame);
+
+            const glow = new THREE.PointLight(CONFIG.torchColor, 0.8, 8);
+            glow.position.y = 1.68;
+            torch.add(glow);
+
+            return torch;
+        }
+
+        function createGate() {
+            const gate = new THREE.Group();
+            const gateMat = makeMaterial(CONFIG.goalColor);
+            const left = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.28, 2.8, 10), gateMat);
+            left.position.set(-0.9, 1.4, 0);
+            left.castShadow = true;
+            gate.add(left);
+
+            const right = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.28, 2.8, 10), gateMat);
+            right.position.set(0.9, 1.4, 0);
+            right.castShadow = true;
+            gate.add(right);
+
+            const arch = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.12, 10, 24, Math.PI), gateMat);
+            arch.position.set(0, 2.45, 0);
+            arch.rotation.z = Math.PI;
+            gate.add(arch);
+
+            const rune = new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.08, 10, 20), gateMat);
+            rune.position.set(0, 1.6, 0);
+            rune.rotation.y = Math.PI / 2;
+            gate.add(rune);
+
+            return gate;
+        }
+
+        function createWisp() {
+            const group = new THREE.Group();
+            const glow = makeMaterial(0xd9f59f);
+            const core = new THREE.Mesh(new THREE.SphereGeometry(0.22, 14, 14), glow);
+            group.add(core);
+
+            const ring = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.05, 10, 18), makeMaterial(0xf6d66b));
+            ring.rotation.x = Math.PI / 2;
+            group.add(ring);
+
+            const shard = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.35, 6), glow);
+            shard.position.y = 0.35;
+            group.add(shard);
+
+            const light = new THREE.PointLight(0xd9f59f, 0.7, 6);
+            group.add(light);
+
+            return group;
+        }
+
+        function buildMaze() {
+            const maze = Array.from({ length: CONFIG.rows }, () => Array(CONFIG.cols).fill(1));
+            const stack = [{ col: 1, row: 1 }];
+            maze[1][1] = 0;
+
+            while (stack.length) {
+                const current = stack[stack.length - 1];
+                const dirs = [
+                    { dc: 0, dr: -2 },
+                    { dc: 2, dr: 0 },
+                    { dc: 0, dr: 2 },
+                    { dc: -2, dr: 0 }
+                ].sort(() => Math.random() - 0.5);
+
+                let carved = false;
+                for (const dir of dirs) {
+                    const nc = current.col + dir.dc;
+                    const nr = current.row + dir.dr;
+                    if (nc <= 0 || nr <= 0 || nc >= CONFIG.cols - 1 || nr >= CONFIG.rows - 1) {
+                        continue;
+                    }
+                    if (maze[nr][nc] === 0) {
+                        continue;
+                    }
+
+                    maze[current.row + dir.dr / 2][current.col + dir.dc / 2] = 0;
+                    maze[nr][nc] = 0;
+                    stack.push({ col: nc, row: nr });
+                    carved = true;
+                    break;
+                }
+
+                if (!carved) {
+                    stack.pop();
+                }
+            }
+
+            maze[1][2] = 0;
+            maze[2][1] = 0;
+            maze[CONFIG.rows - 2][CONFIG.cols - 3] = 0;
+            maze[CONFIG.rows - 3][CONFIG.cols - 2] = 0;
+            maze[CONFIG.rows - 2][CONFIG.cols - 2] = 0;
+            return maze;
+        }
+
+        function clearGroup(group) {
+            while (group.children.length) {
+                group.remove(group.children[0]);
+            }
+        }
+
+        function placeWorld() {
+            clearGroup(wallGroup);
+            clearGroup(collectibleGroup);
+            clearGroup(particleGroup);
+            clearGroup(decoGroup);
+            gameState.collectibles = [];
+            gameState.particles = [];
+            gameState.openCells = [];
+
+            gameState.maze = buildMaze();
+
+            const wallGeo = new THREE.BoxGeometry(CONFIG.cellSize, 3.4, CONFIG.cellSize);
+            for (let row = 0; row < CONFIG.rows; row += 1) {
+                for (let col = 0; col < CONFIG.cols; col += 1) {
+                    const worldPos = worldFromCell(col, row);
+                    if (gameState.maze[row][col] === 1) {
+                        const wall = new THREE.Mesh(wallGeo, wallMaterial);
+                        wall.position.set(worldPos.x, 1.7, worldPos.z);
+                        wall.castShadow = true;
+                        wall.receiveShadow = true;
+                        wallGroup.add(wall);
+
+                        const cap = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.35, 0.28, 8), stoneMaterial);
+                        cap.position.set(worldPos.x, 3.28, worldPos.z);
+                        cap.castShadow = true;
+                        wallGroup.add(cap);
+                    } else {
+                        gameState.openCells.push({ col, row });
+                    }
+                }
+            }
+
+            const perimeter = CONFIG.cols * CONFIG.cellSize * 0.6 + 12;
+            for (let i = 0; i < 18; i += 1) {
+                const tree = createTree();
+                const angle = (i / 18) * Math.PI * 2;
+                const radius = perimeter + (i % 3) * 3;
+                tree.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+                tree.rotation.y = angle + Math.PI / 2;
+                decoGroup.add(tree);
+            }
+
+            const gate = createGate();
+            const goalPos = worldFromCell(gameState.goalCell.col, gameState.goalCell.row);
+            gameState.goalWorld.set(goalPos.x, 0, goalPos.z);
+            gate.position.set(goalPos.x, 0, goalPos.z);
+            decoGroup.add(gate);
+
+            const torchOffsets = [
+                [-1.6, -1.2],
+                [1.6, -1.2],
+                [-1.6, 1.2],
+                [1.6, 1.2]
+            ];
+            for (const [ox, oz] of torchOffsets) {
+                const torch = createTorch();
+                torch.position.set(goalPos.x + ox, 0, goalPos.z + oz);
+                decoGroup.add(torch);
+            }
+
+            const collectibleCells = gameState.openCells.filter((cell) => {
+                const distanceFromSpawn = Math.abs(cell.col - 1) + Math.abs(cell.row - 1);
+                const distanceFromGoal = Math.abs(cell.col - gameState.goalCell.col) + Math.abs(cell.row - gameState.goalCell.row);
+                return distanceFromSpawn > 4 && distanceFromGoal > 2;
+            }).sort(() => Math.random() - 0.5).slice(0, 9);
+
+            collectibleCells.forEach((cell) => {
+                const wisp = createWisp();
+                const pos = worldFromCell(cell.col, cell.row);
+                wisp.position.set(pos.x, 1.05, pos.z);
+                collectibleGroup.add(wisp);
+                gameState.collectibles.push({ cell, mesh: wisp, collected: false, bobOffset: Math.random() * Math.PI * 2 });
+            });
+        }
+
+        function createPlayers() {
+            for (const player of gameState.players) {
+                world.remove(player.group);
+            }
+            gameState.players = [];
+
+            const p1Start = worldFromCell(1, 1);
+            const p2Start = worldFromCell(1, 2);
+            const specs = [
+                {
+                    name: 'Prisha',
+                    color: CONFIG.p1Color,
+                    pos: p1Start,
+                    controls: { up: 'w', down: 's', left: 'a', right: 'd' }
+                },
+                {
+                    name: 'Aarohi',
+                    color: CONFIG.p2Color,
+                    pos: p2Start,
+                    controls: { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' }
+                }
+            ];
+
+            specs.forEach((spec) => {
+                const group = createKnight(spec.color);
+                group.position.set(spec.pos.x, 0, spec.pos.z);
+                world.add(group);
+                gameState.players.push({
+                    name: spec.name,
+                    group,
+                    controls: spec.controls,
+                    velocity: new THREE.Vector3(),
+                    bounce: Math.random() * Math.PI * 2,
+                    reachedGoal: false,
+                    aura: spec.color
+                });
+            });
+
+            gameState.activeTouchPlayer = 0;
+            activePlayerEl.textContent = gameState.players[0].name;
+        }
+
+        function resetGame() {
+            gameState.started = false;
+            gameState.ended = false;
+            gameState.won = false;
+            gameState.score = 0;
+            gameState.timeLeft = CONFIG.timeLimit;
+            gameState.lastFrame = 0;
+            gameState.pulse = 0;
+            gameState.musicTimer = 0;
+            placeWorld();
+            createPlayers();
+            scoreEl.textContent = '0';
+            timerEl.textContent = String(CONFIG.timeLimit);
+            statusEl.textContent = 'Guide both knights to the rune gate. Collect glowing forest wisps for bonus points.';
+            titleScreen.classList.remove('hidden');
+            gameoverScreen.classList.add('hidden');
+        }
+
+        function isWallAt(x, z) {
+            const checks = [
+                [x, z],
+                [x + CONFIG.playerRadius, z],
+                [x - CONFIG.playerRadius, z],
+                [x, z + CONFIG.playerRadius],
+                [x, z - CONFIG.playerRadius]
+            ];
+
+            return checks.some(([cx, cz]) => {
+                const cell = cellFromWorld(cx, cz);
+                if (cell.col < 0 || cell.row < 0 || cell.col >= CONFIG.cols || cell.row >= CONFIG.rows) {
+                    return true;
+                }
+                return gameState.maze[cell.row][cell.col] === 1;
+            });
+        }
+
+        function updatePlayer(player, delta, index) {
+            let moveX = 0;
+            let moveZ = 0;
+
+            if (pressedKeys[player.controls.left]) moveX -= 1;
+            if (pressedKeys[player.controls.right]) moveX += 1;
+            if (pressedKeys[player.controls.up]) moveZ -= 1;
+            if (pressedKeys[player.controls.down]) moveZ += 1;
+
+            if (index === gameState.activeTouchPlayer) {
+                if (gameState.touch.left) moveX -= 1;
+                if (gameState.touch.right) moveX += 1;
+                if (gameState.touch.up) moveZ -= 1;
+                if (gameState.touch.down) moveZ += 1;
+            }
+
+            const move = new THREE.Vector2(moveX, moveZ);
+            if (move.lengthSq() > 1) move.normalize();
+
+            const nextX = player.group.position.x + move.x * CONFIG.playerSpeed * delta;
+            const nextZ = player.group.position.z + move.y * CONFIG.playerSpeed * delta;
+
+            if (!isWallAt(nextX, player.group.position.z)) {
+                player.group.position.x = nextX;
+            }
+            if (!isWallAt(player.group.position.x, nextZ)) {
+                player.group.position.z = nextZ;
+            }
+
+            player.bounce += delta * 4;
+            player.group.position.y = 0.06 + Math.sin(player.bounce) * 0.06;
+            if (move.lengthSq() > 0.02) {
+                player.group.rotation.y = Math.atan2(move.x, move.y * -1);
+            }
+
+            player.reachedGoal = player.group.position.distanceTo(gameState.goalWorld) < 1.6;
+        }
+
+        function spawnParticles(position, color, count) {
+            for (let i = 0; i < count; i += 1) {
+                const spark = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.08, 8, 8),
+                    new THREE.MeshStandardMaterial({
+                        color,
+                        emissive: color,
+                        emissiveIntensity: 0.8,
+                        transparent: true,
+                        opacity: 1
+                    })
+                );
+                spark.position.copy(position);
+                particleGroup.add(spark);
+                gameState.particles.push({
+                    mesh: spark,
+                    velocity: new THREE.Vector3((Math.random() - 0.5) * 4, Math.random() * 3 + 1, (Math.random() - 0.5) * 4),
+                    life: 1 + Math.random() * 0.5
+                });
+            }
+        }
+
+        function updateCollectibles(delta) {
+            gameState.collectibles.forEach((item) => {
+                if (item.collected) return;
+                item.bobOffset += delta * 2;
+                item.mesh.position.y = 1 + Math.sin(item.bobOffset) * 0.24;
+                item.mesh.rotation.y += delta * 1.6;
+
+                for (const player of gameState.players) {
+                    if (player.group.position.distanceTo(item.mesh.position) < 1) {
+                        item.collected = true;
+                        collectibleGroup.remove(item.mesh);
+                        gameState.score += CONFIG.scorePerWisp;
+                        scoreEl.textContent = String(gameState.score);
+                        statusEl.textContent = player.name + ' captured an ancient forest wisp.';
+                        spawnParticles(item.mesh.position.clone(), CONFIG.particleColor, 10);
+                        playTone(660, 0.09, 'triangle', 0.09);
+                        break;
+                    }
+                }
+            });
+        }
+
+        function updateParticles(delta) {
+            gameState.particles = gameState.particles.filter((particle) => {
+                particle.life -= delta;
+                particle.mesh.position.addScaledVector(particle.velocity, delta);
+                particle.velocity.y -= 4.2 * delta;
+                particle.mesh.material.opacity = Math.max(0, particle.life);
+                if (particle.life <= 0) {
+                    particleGroup.remove(particle.mesh);
+                    return false;
+                }
+                return true;
+            });
+        }
+
+        function updateCamera(delta) {
+            const midpoint = new THREE.Vector3();
+            midpoint.add(gameState.players[0].group.position);
+            midpoint.add(gameState.players[1].group.position);
+            midpoint.multiplyScalar(0.5);
+
+            const targetPos = new THREE.Vector3(midpoint.x, 30, midpoint.z + 14);
+            camera.position.lerp(targetPos, 1 - Math.exp(-delta * 2.8));
+            camera.lookAt(midpoint.x, 0, midpoint.z);
+            heroGlow.position.set(midpoint.x, 5.5, midpoint.z + 2);
+        }
+
+        function updateStatus() {
+            const ready = gameState.players.filter((player) => player.reachedGoal).map((player) => player.name);
+            if (ready.length === 2) {
+                statusEl.textContent = 'Both heroes reached the rune gate. The forest opens.';
+            } else if (ready.length === 1) {
+                statusEl.textContent = ready[0] + ' is at the gate. Bring the other knight to the exit.';
+            }
+        }
+
+        function startGame() {
+            if (gameState.started && !gameState.ended) return;
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            titleScreen.classList.add('hidden');
+            gameoverScreen.classList.add('hidden');
+            gameState.started = true;
+            gameState.ended = false;
+            gameState.won = false;
+            gameState.lastFrame = performance.now();
+            ensureAudio();
+        }
+
+        function finishGame(won) {
+            if (gameState.ended) return;
+            gameState.ended = true;
+            gameState.started = false;
+            gameState.won = won;
+            if (won) {
+                gameState.score += Math.max(0, Math.floor(gameState.timeLeft * 4)) + CONFIG.winBonus;
+                scoreEl.textContent = String(gameState.score);
+                endTitleEl.textContent = 'Victory';
+                statusEl.textContent = 'The enchanted gate unlocks and the maze is conquered.';
+                playTone(523.25, 0.18, 'triangle', 0.14);
+                playTone(659.25, 0.22, 'triangle', 0.14, 0.08);
+                playTone(783.99, 0.28, 'triangle', 0.14, 0.16);
+                spawnParticles(gameState.goalWorld.clone().setY(1.6), CONFIG.goalColor, 18);
+            } else {
+                endTitleEl.textContent = 'Time\'s Up';
+                statusEl.textContent = 'The forest mist closed in before both heroes escaped.';
+                playTone(196, 0.35, 'sawtooth', 0.12);
+                playTone(146.83, 0.4, 'triangle', 0.08, 0.1);
+            }
+            finalScoreEl.textContent = 'Score: ' + gameState.score;
+            gameoverScreen.classList.remove('hidden');
+        }
+
+        function ensureAudio() {
+            if (audioCtx) return;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        function playTone(freq, duration, type, volume, delay = 0) {
+            if (!audioCtx) return;
+            const startAt = audioCtx.currentTime + delay;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, startAt);
+            gain.gain.setValueAtTime(0.0001, startAt);
+            gain.gain.exponentialRampToValueAtTime(volume, startAt + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(startAt);
+            osc.stop(startAt + duration + 0.05);
+        }
+
+        function updateMusic(delta) {
+            if (!audioCtx || gameState.ended || !gameState.started) return;
+            gameState.musicTimer -= delta;
+            if (gameState.musicTimer > 0) return;
+
+            const melody = [293.66, 349.23, 392.0, 440.0, 392.0, 349.23];
+            const note = melody[Math.floor(performance.now() / 500) % melody.length];
+            playTone(note, 0.28, 'triangle', 0.018);
+            playTone(note / 2, 0.24, 'sine', 0.01, 0.04);
+            gameState.musicTimer = 0.42;
+        }
+
+        function animate(time) {
+            requestAnimationFrame(animate);
+            const delta = Math.min(0.033, (time - gameState.lastFrame) / 1000 || 0.016);
+            gameState.lastFrame = time;
+            gameState.pulse += delta;
+
+            decoGroup.children.forEach((child) => {
+                if (child.children && child.children.length && child.children[0].geometry && child.children[0].geometry.type === 'CylinderGeometry') {
+                    child.rotation.y += delta * 0.1;
+                }
+            });
+
+            if (gameState.started && !gameState.ended) {
+                gameState.timeLeft = Math.max(0, gameState.timeLeft - delta);
+                timerEl.textContent = String(Math.ceil(gameState.timeLeft));
+                for (let i = 0; i < gameState.players.length; i += 1) {
+                    updatePlayer(gameState.players[i], delta, i);
+                }
+                updateCollectibles(delta);
+                updateParticles(delta);
+                updateCamera(delta);
+                updateStatus();
+                updateMusic(delta);
+
+                const gateGlow = 0.5 + Math.sin(gameState.pulse * 4) * 0.25;
+                heroGlow.intensity = 0.7 + Math.sin(gameState.pulse * 5) * 0.12;
+                ambientLight.intensity = 0.82 + gateGlow * 0.12;
+
+                if (gameState.players.every((player) => player.reachedGoal)) {
+                    finishGame(true);
+                } else if (gameState.timeLeft <= 0) {
+                    finishGame(false);
+                }
+            } else {
+                updateParticles(delta);
+                if (gameState.players.length) {
+                    updateCamera(delta);
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function resize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function bindTouchButton(id, key) {
+            const btn = document.getElementById(id);
+            const press = (event) => {
+                event.preventDefault();
+                gameState.touch[key] = true;
+                btn.classList.add('active');
+            };
+            const release = (event) => {
+                event.preventDefault();
+                gameState.touch[key] = false;
+                btn.classList.remove('active');
+            };
+            btn.addEventListener('pointerdown', press);
+            btn.addEventListener('pointerup', release);
+            btn.addEventListener('pointerleave', release);
+            btn.addEventListener('pointercancel', release);
+        }
+
+        bindTouchButton('touch-up', 'up');
+        bindTouchButton('touch-down', 'down');
+        bindTouchButton('touch-left', 'left');
+        bindTouchButton('touch-right', 'right');
+
+        document.getElementById('touch-switch').addEventListener('pointerdown', (event) => {
+            event.preventDefault();
+            gameState.activeTouchPlayer = (gameState.activeTouchPlayer + 1) % gameState.players.length;
+            activePlayerEl.textContent = gameState.players[gameState.activeTouchPlayer].name;
+            playTone(392, 0.08, 'triangle', 0.05);
+        });
+
+        window.addEventListener('keydown', (event) => {
+            pressedKeys[event.key] = true;
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(event.key)) {
+                event.preventDefault();
+            }
+            if (event.key === ' ' && !gameState.started && !gameState.ended) {
+                startGame();
+            }
+        });
+
+        window.addEventListener('keyup', (event) => {
+            pressedKeys[event.key] = false;
+        });
+
+        titleScreen.addEventListener('click', startGame);
+        titleScreen.addEventListener('touchend', (event) => {
+            event.preventDefault();
+            startGame();
+        }, { passive: false });
+        restartBtn.addEventListener('click', () => {
+            resetGame();
+            startGame();
+        });
+        restartBtn.addEventListener('touchend', (event) => {
+            event.preventDefault();
+            resetGame();
+            startGame();
+        }, { passive: false });
+
+        window.addEventListener('resize', resize);
+
+        resetGame();
+        animate(0);
+    </script>
+</body>
+</html>
