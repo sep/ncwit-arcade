@@ -42,7 +42,6 @@ const GAMES = [
     "color": "Monochrome"
   },
   {
-<<<<<<< Updated upstream
     "title": "Barbie Road Raider",
     "author": "Copilot x Barbie Racer",
     "path": "games/barbie-road-raider/index.html",
@@ -69,8 +68,8 @@ const GAMES = [
     "path": "games/annmarie-lee/index.html",
     "genre": "Cat Combo Fighter",
     "color": "Sunset"
-
-=======
+  },
+  {
     "title": "Geometry Run",
     "author": "sush",
     "path": "games/sush/index.html",
@@ -83,6 +82,5 @@ const GAMES = [
     "path": "games/geometry-run/index.html",
     "genre": "Platformer",
     "color": "Neon Cyber"
->>>>>>> Stashed changes
   }
 ];
