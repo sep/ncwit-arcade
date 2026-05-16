@@ -75,5 +75,19 @@ const GAMES = [
     "path": "games/seth/index.html",
     "genre": "Dodge It!",
     "color": "Neon Cyber"
+  },
+  {
+    "title": "Geometry Run",
+    "author": "Geometry Run",
+    "path": "games/geometry-run/index.html",
+    "genre": "Platformer",
+    "color": "Neon Cyber"
+  },
+  {
+    "title": "Geometry Dash",
+    "author": "Sush",
+    "path": "games/sush/index.html",
+    "genre": "Platformer",
+    "color": "Neon Cyber"
   }
 ];
