@@ -54,5 +54,12 @@ const GAMES = [
     "path": "games/prisha-and-aarohi/index.html",
     "genre": "Maze Runner",
     "color": "Forest"
+  },
+  {
+    "title": "Infinity Run",
+    "author": "Copilot x Marvel Runner",
+    "path": "games/marvel-infinity-run/index.html",
+    "genre": "Space Chase",
+    "color": "Neon Cyber"
   }
 ];

@@ -1,0 +1,1288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marvel Infinity Run</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg-deep: #070b1c;
+            --bg-mid: #101a3a;
+            --accent: #6ce8ff;
+            --danger: #ff6f5e;
+            --gold: #ffdb75;
+            --hud: rgba(8, 14, 34, 0.72);
+            --hud-border: rgba(108, 232, 255, 0.45);
+        }
+
+        body {
+            overflow: hidden;
+            background:
+                radial-gradient(circle at 20% -10%, #1b2d66 0%, transparent 35%),
+                radial-gradient(circle at 80% 0%, #451f50 0%, transparent 30%),
+                linear-gradient(180deg, var(--bg-mid), var(--bg-deep));
+            color: #f5fbff;
+            font-family: "Trebuchet MS", "Avenir Next", "Segoe UI", sans-serif;
+        }
+
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #ui {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #hud {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            right: 12px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: space-between;
+            font-weight: 700;
+            font-size: clamp(0.9rem, 2.2vw, 1.1rem);
+        }
+
+        .pill {
+            background: var(--hud);
+            border: 1px solid var(--hud-border);
+            border-radius: 999px;
+            padding: 8px 12px;
+            backdrop-filter: blur(4px);
+            box-shadow: 0 0 15px rgba(76, 217, 255, 0.15);
+        }
+
+        #hint {
+            position: absolute;
+            bottom: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(8, 14, 34, 0.65);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 999px;
+            padding: 8px 14px;
+            font-size: 0.92rem;
+            color: rgba(245, 251, 255, 0.9);
+            text-align: center;
+        }
+
+        .screen {
+            position: fixed;
+            inset: 0;
+            z-index: 20;
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(145deg, rgba(7, 11, 28, 0.88), rgba(16, 26, 58, 0.92));
+            padding: 18px;
+        }
+
+        .panel {
+            width: min(760px, 96vw);
+            border-radius: 22px;
+            border: 2px solid rgba(108, 232, 255, 0.4);
+            background:
+                radial-gradient(circle at 90% -20%, rgba(108, 232, 255, 0.28), transparent 40%),
+                linear-gradient(170deg, rgba(19, 31, 70, 0.9), rgba(8, 14, 34, 0.95));
+            box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+            padding: clamp(18px, 4vw, 34px);
+            text-align: center;
+            animation: rise 450ms ease;
+        }
+
+        h1 {
+            font-size: clamp(2.1rem, 8vw, 3.6rem);
+            color: var(--accent);
+            letter-spacing: 1px;
+            text-shadow: 0 0 14px rgba(108, 232, 255, 0.6);
+        }
+
+        .sub {
+            margin-top: 8px;
+            font-size: clamp(1rem, 2.8vw, 1.2rem);
+            color: #d6f4ff;
+        }
+
+        .how {
+            margin: 16px auto;
+            text-align: left;
+            max-width: 620px;
+            line-height: 1.45;
+            font-size: clamp(0.95rem, 2.5vw, 1.05rem);
+            background: rgba(4, 9, 24, 0.55);
+            border: 1px solid rgba(108, 232, 255, 0.25);
+            border-radius: 14px;
+            padding: 12px 14px;
+        }
+
+        .start-text {
+            margin-top: 14px;
+            color: var(--gold);
+            font-size: clamp(1rem, 3.2vw, 1.25rem);
+            animation: pulse 1.4s infinite ease-in-out;
+        }
+
+        .big {
+            margin: 12px 0;
+            font-size: clamp(1.15rem, 4vw, 1.45rem);
+        }
+
+        button {
+            border: none;
+            border-radius: 999px;
+            min-height: 48px;
+            padding: 10px 24px;
+            font-size: 1rem;
+            font-weight: 700;
+            color: #051221;
+            background: linear-gradient(120deg, #88ebff, #5ac6f7);
+            cursor: pointer;
+            box-shadow: 0 10px 22px rgba(0, 0, 0, 0.3);
+            transition: transform 120ms ease;
+        }
+
+        button:hover { transform: translateY(-2px); }
+        .hidden { display: none !important; }
+
+        #mobile-controls {
+            display: none;
+            position: fixed;
+            inset: auto 0 0 0;
+            z-index: 16;
+            pointer-events: auto;
+            padding: 10px;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .touch-btn {
+            width: 62px;
+            height: 62px;
+            border-radius: 14px;
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        .touch-btn.active {
+            background: rgba(108, 232, 255, 0.35);
+            border-color: rgba(255, 255, 255, 0.9);
+        }
+
+        @media (pointer: coarse), (max-width: 900px) {
+            #mobile-controls { display: flex; }
+            #hint { display: none; }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.45; }
+        }
+
+        @keyframes rise {
+            from { transform: translateY(12px) scale(0.98); opacity: 0; }
+            to { transform: translateY(0) scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="ui">
+    <div id="hud">
+        <div class="pill" id="score">Stones: 0/6</div>
+        <div class="pill" id="distance">Threat: --</div>
+        <div class="pill" id="boost">Powers: 0/6</div>
+        <div class="pill" id="time">Level 1 | 0s</div>
+    </div>
+    <div id="hint">Survive each level to unlock one Infinity Stone. Collect all six to face Thanos in the final boss fight.</div>
+</div>
+
+<div id="mobile-controls">
+    <div class="touch-btn" id="btn-left">◀</div>
+    <div class="touch-btn" id="btn-right">▶</div>
+    <div class="touch-btn" id="btn-up">▲</div>
+    <div class="touch-btn" id="btn-down">▼</div>
+    <div class="touch-btn" id="btn-fire">✦</div>
+</div>
+
+<div id="title-screen" class="screen">
+    <div class="panel">
+        <h1>Infinity Run</h1>
+        <p class="sub">Captain Marvel Space Escape</p>
+        <div class="how">
+            <p><strong>Story:</strong> Captain Marvel must survive six escalating sectors of space while Thanos hunts from behind.</p>
+            <p><strong>Rules:</strong> Only one Infinity Stone is available per level, and it appears only after you survive that level timer.</p>
+            <p><strong>Progression:</strong> Every stone unlocks a new permanent power. Use all six powers in the final Thanos boss battle.</p>
+            <p><strong>Controls:</strong> Move with WASD/Arrows, Dash with Shift (after Space Stone), Fire with Space/X in boss fight, Time Slow with C (after Time Stone).</p>
+        </div>
+        <p class="start-text">Press SPACE or Tap to Start</p>
+    </div>
+</div>
+
+<div id="gameover-screen" class="screen hidden">
+    <div class="panel">
+        <h1 id="result-title">Caught by Thanos</h1>
+        <p class="big" id="final-stats">Stones 0 | Time 0s</p>
+        <button id="restart-btn">Try Again</button>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+const STONES = [
+    { name: 'Power Stone', color: '#f95d5d', power: 'Higher damage and speed' },
+    { name: 'Space Stone', color: '#6ea7ff', power: 'Dash with Shift' },
+    { name: 'Reality Stone', color: '#ff7ed9', power: 'Phase through asteroid hits' },
+    { name: 'Time Stone', color: '#65e795', power: 'Slows enemies; C activates time field in boss' },
+    { name: 'Mind Stone', color: '#ffd75e', power: 'Stone magnet and homing shots' },
+    { name: 'Soul Stone', color: '#ff9c58', power: 'Soul pulse and lifesteal on boss hits' }
+];
+
+const LEVELS = [
+    { name: 'Star Escape', mode: 'chase', duration: 18, objective: 'Outrun Thanos through open space.' },
+    { name: 'Nebula Platforms', mode: 'platformer', duration: 24, objective: 'Jump across platforms and avoid the void.' },
+    { name: 'Meteor Storm', mode: 'storm', duration: 22, objective: 'Survive heavy asteroid rain.' },
+    { name: 'Dark Sector', mode: 'blackout', duration: 24, objective: 'Navigate with limited visibility.' },
+    { name: 'Wormhole Rift', mode: 'warp', duration: 24, objective: 'Endure random spatial warps.' },
+    { name: 'Gauntlet Trial', mode: 'gauntlet', duration: 28, objective: 'Survive mixed hazards and drone fire.' }
+];
+
+const ui = {
+    score: document.getElementById('score'),
+    distance: document.getElementById('distance'),
+    boost: document.getElementById('boost'),
+    time: document.getElementById('time'),
+    hint: document.getElementById('hint'),
+    title: document.getElementById('title-screen'),
+    gameover: document.getElementById('gameover-screen'),
+    resultTitle: document.getElementById('result-title'),
+    final: document.getElementById('final-stats')
+};
+
+const state = {
+    mode: 'title',
+    phase: 'survive',
+    t: 0,
+    elapsed: 0,
+    stones: 0,
+    currentLevel: 1,
+    survivalLeft: 20,
+    stoneAvailable: false,
+    stars: [],
+    stoneDrops: [],
+    asteroids: [],
+    particles: [],
+    shots: [],
+    enemyShots: [],
+    unlocked: [],
+    phaseShieldCooldown: 0,
+    dashCooldown: 0,
+    shotCooldown: 0,
+    slowFieldCooldown: 0,
+    slowFieldTimer: 0,
+    soulPulseCooldown: 0,
+    asteroidCooldown: 0,
+    warpCooldown: 0,
+    droneCooldown: 0,
+    message: 'Survive the level!',
+    messageTimer: 120,
+    levelConfig: LEVELS[0],
+    platforms: [],
+    hazardShots: [],
+    requestJump: false,
+    player: { x: 0, y: 0, vx: 0, vy: 0, size: 20, hp: 100 },
+    thanos: { x: -180, y: 40, size: 30, speed: 0.7, hp: 0, maxHp: 0, dir: 1, attackCooldown: 0 },
+    keys: { left: false, right: false, up: false, down: false, fire: false }
+};
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+function hasStone(idx) {
+    return state.unlocked.includes(idx);
+}
+
+function setMessage(text, duration) {
+    state.message = text;
+    state.messageTimer = duration;
+}
+
+function initStars() {
+    state.stars = [];
+    for (let i = 0; i < 170; i++) {
+        state.stars.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            z: Math.random() * 1.9 + 0.2,
+            twinkle: Math.random() * Math.PI * 2
+        });
+    }
+}
+
+function setupLevel(level) {
+    const config = LEVELS[level - 1];
+    state.phase = 'survive';
+    state.currentLevel = level;
+    state.levelConfig = config;
+    state.survivalLeft = config.duration;
+    state.stoneAvailable = false;
+    state.stoneDrops = [];
+    state.asteroids = [];
+    state.platforms = [];
+    state.hazardShots = [];
+    state.shots = [];
+    state.enemyShots = [];
+    state.asteroidCooldown = 58 - level * 3;
+    state.warpCooldown = 260;
+    state.droneCooldown = 90;
+
+    state.player.x = canvas.width * 0.62;
+    state.player.y = canvas.height * 0.5;
+    state.player.vx = 0;
+    state.player.vy = 0;
+    state.player.onGround = false;
+    state.player.jumpCount = 0;
+
+    state.thanos.x = canvas.width * 0.15;
+    state.thanos.y = canvas.height * 0.56;
+    state.thanos.speed = 0.34 + level * 0.08;
+
+    if (config.mode === 'platformer') {
+        const h = canvas.height;
+        const w = canvas.width;
+        state.platforms = [
+            { x: 0.07 * w, y: 0.82 * h, w: 0.3 * w, h: 18 },
+            { x: 0.34 * w, y: 0.7 * h, w: 0.24 * w, h: 18 },
+            { x: 0.62 * w, y: 0.58 * h, w: 0.24 * w, h: 18 },
+            { x: 0.2 * w, y: 0.46 * h, w: 0.24 * w, h: 18 },
+            { x: 0.52 * w, y: 0.34 * h, w: 0.3 * w, h: 18 }
+        ];
+        state.player.x = 0.14 * w;
+        state.player.y = 0.78 * h;
+        state.player.onGround = true;
+        state.player.jumpCount = 0;
+    }
+
+    setMessage(`Level ${level} - ${config.name}: ${config.objective}`, 220);
+}
+
+function resetGame() {
+    state.mode = 'playing';
+    state.t = 0;
+    state.elapsed = 0;
+    state.stones = 0;
+    state.unlocked = [];
+    state.stoneDrops = [];
+    state.asteroids = [];
+    state.particles = [];
+    state.shots = [];
+    state.enemyShots = [];
+    state.phaseShieldCooldown = 0;
+    state.dashCooldown = 0;
+    state.shotCooldown = 0;
+    state.slowFieldCooldown = 0;
+    state.slowFieldTimer = 0;
+    state.soulPulseCooldown = 0;
+    state.asteroidCooldown = 0;
+    state.player.hp = 100;
+    state.phase = 'survive';
+    initStars();
+    setupLevel(1);
+
+    ui.title.classList.add('hidden');
+    ui.gameover.classList.add('hidden');
+}
+
+function endGame(titleText) {
+    state.mode = 'gameover';
+    ui.resultTitle.textContent = titleText;
+    ui.final.textContent = `Stones ${state.stones}/6 | Time ${Math.floor(state.elapsed)}s | Level ${state.currentLevel}`;
+    ui.gameover.classList.remove('hidden');
+}
+
+function spawnLevelStone() {
+    const idx = state.currentLevel - 1;
+    state.stoneDrops.push({
+        x: canvas.width * (0.28 + Math.random() * 0.44),
+        y: canvas.height * (0.24 + Math.random() * 0.52),
+        size: 18,
+        color: STONES[idx].color,
+        spin: Math.random() * Math.PI * 2,
+        driftX: (Math.random() - 0.5) * 0.22,
+        driftY: (Math.random() - 0.5) * 0.22,
+        level: state.currentLevel,
+        name: STONES[idx].name
+    });
+}
+
+function spawnAsteroid() {
+    const edge = Math.floor(Math.random() * 4);
+    let x = 0;
+    let y = 0;
+    let vx = 0;
+    let vy = 0;
+    const speed = 1.4 + Math.random() * 1.1 + state.currentLevel * 0.26;
+
+    if (edge === 0) {
+        x = -60; y = Math.random() * canvas.height;
+        vx = speed; vy = (Math.random() - 0.5) * 1.2;
+    }
+    if (edge === 1) {
+        x = canvas.width + 60; y = Math.random() * canvas.height;
+        vx = -speed; vy = (Math.random() - 0.5) * 1.2;
+    }
+    if (edge === 2) {
+        x = Math.random() * canvas.width; y = -60;
+        vx = (Math.random() - 0.5) * 1.2; vy = speed;
+    }
+    if (edge === 3) {
+        x = Math.random() * canvas.width; y = canvas.height + 60;
+        vx = (Math.random() - 0.5) * 1.2; vy = -speed;
+    }
+
+    state.asteroids.push({
+        x,
+        y,
+        vx,
+        vy,
+        size: 14 + Math.random() * 16,
+        rot: Math.random() * Math.PI * 2,
+        rotSpeed: (Math.random() - 0.5) * 0.08
+    });
+}
+
+function burstParticles(x, y, color, count) {
+    for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 1 + Math.random() * 4;
+        state.particles.push({
+            x,
+            y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 22 + Math.random() * 16,
+            color
+        });
+    }
+}
+
+function unlockStone(level) {
+    const idx = level - 1;
+    if (!state.unlocked.includes(idx)) {
+        state.unlocked.push(idx);
+    }
+    state.stones = state.unlocked.length;
+    setMessage(`${STONES[idx].name} unlocked: ${STONES[idx].power}`, 180);
+}
+
+function beginBossFight() {
+    state.phase = 'boss';
+    state.currentLevel = 7;
+    state.stoneDrops = [];
+    state.asteroids = [];
+    state.enemyShots = [];
+    state.hazardShots = [];
+    state.shots = [];
+    state.survivalLeft = 0;
+
+    state.player.x = canvas.width * 0.5;
+    state.player.y = canvas.height * 0.84;
+    state.player.vx = 0;
+    state.player.vy = 0;
+    state.player.hp = Math.min(100, state.player.hp + 22);
+
+    state.thanos.x = canvas.width * 0.5;
+    state.thanos.y = canvas.height * 0.2;
+    state.thanos.hp = 320;
+    state.thanos.maxHp = 320;
+    state.thanos.dir = 1;
+    state.thanos.attackCooldown = 35;
+
+    setMessage('Final Boss: Use all six Infinity powers to defeat Thanos!', 220);
+}
+
+function tryDash() {
+    if (!hasStone(1) || state.dashCooldown > 0) {
+        return;
+    }
+
+    let dirX = 0;
+    let dirY = 0;
+    if (state.keys.left) dirX -= 1;
+    if (state.keys.right) dirX += 1;
+    if (state.keys.up) dirY -= 1;
+    if (state.keys.down) dirY += 1;
+    if (dirX === 0 && dirY === 0) {
+        dirX = 1;
+    }
+
+    const len = Math.hypot(dirX, dirY) || 1;
+    state.player.x += (dirX / len) * 90;
+    state.player.y += (dirY / len) * 90;
+    state.player.x = Math.max(30, Math.min(canvas.width - 30, state.player.x));
+    state.player.y = Math.max(30, Math.min(canvas.height - 30, state.player.y));
+    state.dashCooldown = 110;
+    burstParticles(state.player.x, state.player.y, '#6ea7ff', 20);
+}
+
+function shoot() {
+    if (state.phase !== 'boss' || state.shotCooldown > 0) {
+        return;
+    }
+
+    state.shots.push({
+        x: state.player.x,
+        y: state.player.y - 15,
+        vx: 0,
+        vy: -7.8,
+        size: hasStone(2) ? 6 : 4,
+        damage: 8 + (hasStone(0) ? 4 : 0) + (hasStone(2) ? 2 : 0)
+    });
+    state.shotCooldown = hasStone(5) ? 8 : 12;
+}
+
+function activateTimeField() {
+    if (state.phase !== 'boss' || !hasStone(3) || state.slowFieldCooldown > 0) {
+        return;
+    }
+    state.slowFieldTimer = 160;
+    state.slowFieldCooldown = 430;
+    burstParticles(state.player.x, state.player.y, '#65e795', 30);
+}
+
+function updatePlayerMovement(dt) {
+    const accel = 0.44;
+    const baseMaxSpeed = 6.5 + (hasStone(0) ? 0.9 : 0);
+    const friction = 0.84;
+
+    if (state.levelConfig.mode === 'platformer' && state.phase === 'survive') {
+        if (state.keys.left) state.player.vx -= 0.5;
+        if (state.keys.right) state.player.vx += 0.5;
+
+        if (state.requestJump && state.player.jumpCount < 2) {
+            state.player.vy = -9.4;
+            state.player.jumpCount += 1;
+            state.player.onGround = false;
+        }
+        state.requestJump = false;
+
+        const wasOnGround = state.player.onGround;
+        state.player.onGround = false;
+        if (wasOnGround && state.player.jumpCount === 0) {
+            // Keeps the first jump available until we actually leave the platform.
+            state.player.jumpCount = 0;
+        }
+
+        state.player.vy += 0.45;
+        state.player.vx *= 0.9;
+        state.player.vx = Math.max(-7.4, Math.min(7.4, state.player.vx));
+        state.player.vy = Math.max(-11, Math.min(11, state.player.vy));
+
+        const prevY = state.player.y;
+        state.player.x += state.player.vx;
+        state.player.y += state.player.vy;
+
+        for (const p of state.platforms) {
+            const halfW = state.player.size * 0.65;
+            const prevBottom = prevY + state.player.size;
+            const newBottom = state.player.y + state.player.size;
+            const insideX = state.player.x + halfW > p.x && state.player.x - halfW < p.x + p.w;
+            if (insideX && prevBottom <= p.y && newBottom >= p.y) {
+                state.player.y = p.y - state.player.size;
+                state.player.vy = 0;
+                state.player.onGround = true;
+                state.player.jumpCount = 0;
+            }
+        }
+
+        state.player.x = Math.max(20, Math.min(canvas.width - 20, state.player.x));
+        if (state.player.y > canvas.height + 40) {
+            state.player.x = canvas.width * 0.14;
+            state.player.y = canvas.height * 0.78;
+            state.player.vx = 0;
+            state.player.vy = 0;
+            state.player.onGround = true;
+            state.player.jumpCount = 0;
+            state.thanos.speed += 0.04;
+            burstParticles(state.player.x, state.player.y, '#ff6f5e', 14);
+        }
+        return;
+    }
+
+    if (state.keys.left) state.player.vx -= accel;
+    if (state.keys.right) state.player.vx += accel;
+    if (state.keys.up) state.player.vy -= accel;
+    if (state.keys.down) state.player.vy += accel;
+
+    state.player.vx *= friction;
+    state.player.vy *= friction;
+    state.player.vx = Math.max(-baseMaxSpeed, Math.min(baseMaxSpeed, state.player.vx));
+    state.player.vy = Math.max(-baseMaxSpeed, Math.min(baseMaxSpeed, state.player.vy));
+
+    state.player.x += state.player.vx;
+    state.player.y += state.player.vy;
+
+    const wall = 28;
+    state.player.x = Math.max(wall, Math.min(canvas.width - wall, state.player.x));
+    state.player.y = Math.max(wall, Math.min(canvas.height - wall, state.player.y));
+}
+
+function update(dt) {
+    if (state.mode !== 'playing') {
+        return;
+    }
+
+    state.t += dt;
+    state.elapsed += dt / 60;
+    updatePlayerMovement(dt);
+
+    if (state.dashCooldown > 0) state.dashCooldown -= dt;
+    if (state.phaseShieldCooldown > 0) state.phaseShieldCooldown -= dt;
+    if (state.shotCooldown > 0) state.shotCooldown -= dt;
+    if (state.slowFieldCooldown > 0) state.slowFieldCooldown -= dt;
+    if (state.slowFieldTimer > 0) state.slowFieldTimer -= dt;
+    if (state.soulPulseCooldown > 0) state.soulPulseCooldown -= dt;
+
+    if (state.phase === 'boss') {
+        updateBoss(dt);
+    } else {
+        updateSurvivalLevel(dt);
+    }
+
+    for (let i = state.particles.length - 1; i >= 0; i--) {
+        const p = state.particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vx *= 0.97;
+        p.vy *= 0.97;
+        p.life -= 1;
+        if (p.life <= 0) {
+            state.particles.splice(i, 1);
+        }
+    }
+
+    if (state.messageTimer > 0) {
+        state.messageTimer -= dt;
+    }
+
+    const threat = state.phase === 'boss'
+        ? `Boss HP: ${Math.max(0, Math.ceil(state.thanos.hp))}`
+        : `Thanos: ${Math.max(0, Math.floor(Math.hypot(state.player.x - state.thanos.x, state.player.y - state.thanos.y)))}`;
+
+    const timeText = state.phase === 'boss'
+        ? `Final Level | HP ${Math.ceil(state.player.hp)}`
+        : `Level ${state.currentLevel} ${state.levelConfig.name} | ${Math.max(0, Math.ceil(state.survivalLeft))}s`;
+
+    ui.score.textContent = `Stones: ${state.stones}/6`;
+    ui.distance.textContent = threat;
+    ui.boost.textContent = `Powers: ${state.unlocked.length}/6`;
+    ui.time.textContent = timeText;
+
+    const defaultHint = state.phase === 'boss'
+        ? 'Boss: Space/X to fire, Shift to dash, C for Time Field.'
+        : `${state.levelConfig.objective} Then collect the level stone.`;
+    ui.hint.textContent = state.messageTimer > 0 ? state.message : defaultHint;
+}
+
+function updateSurvivalLevel(dt) {
+    const mode = state.levelConfig.mode;
+
+    state.asteroidCooldown -= dt;
+    if (state.asteroidCooldown <= 0) {
+        spawnAsteroid();
+        const intervalByMode = {
+            chase: 52,
+            platformer: 72,
+            storm: 22,
+            blackout: 36,
+            warp: 34,
+            gauntlet: 28
+        };
+        const base = intervalByMode[mode] || 40;
+        state.asteroidCooldown = Math.max(12, base - state.currentLevel * 2);
+    }
+
+    if (mode === 'warp') {
+        state.warpCooldown -= dt;
+        if (state.warpCooldown <= 0) {
+            state.player.x = 60 + Math.random() * (canvas.width - 120);
+            state.player.y = 60 + Math.random() * (canvas.height - 120);
+            state.warpCooldown = 260;
+            burstParticles(state.player.x, state.player.y, '#6ea7ff', 18);
+            setMessage('Wormhole jump!', 70);
+        }
+    }
+
+    if (mode === 'gauntlet') {
+        state.droneCooldown -= dt;
+        if (state.droneCooldown <= 0) {
+            const sx = Math.random() < 0.5 ? -20 : canvas.width + 20;
+            const sy = 60 + Math.random() * (canvas.height - 120);
+            const dx = state.player.x - sx;
+            const dy = state.player.y - sy;
+            const len = Math.hypot(dx, dy) || 1;
+            state.hazardShots.push({
+                x: sx,
+                y: sy,
+                vx: (dx / len) * 3.6,
+                vy: (dy / len) * 3.6,
+                size: 8
+            });
+            state.droneCooldown = 58;
+        }
+    }
+
+    const thanosModeMultiplier = {
+        chase: 1,
+        platformer: 0.75,
+        storm: 1.06,
+        blackout: 1.14,
+        warp: 1.1,
+        gauntlet: 1.2
+    };
+
+    for (let i = state.hazardShots.length - 1; i >= 0; i--) {
+        const shot = state.hazardShots[i];
+        shot.x += shot.vx;
+        shot.y += shot.vy;
+        const dx = shot.x - state.player.x;
+        const dy = shot.y - state.player.y;
+        if (Math.hypot(dx, dy) < state.player.size + shot.size) {
+            state.thanos.speed += 0.08;
+            burstParticles(state.player.x, state.player.y, '#ff6f5e', 12);
+            state.hazardShots.splice(i, 1);
+            continue;
+        }
+        if (shot.x < -80 || shot.x > canvas.width + 80 || shot.y < -80 || shot.y > canvas.height + 80) {
+            state.hazardShots.splice(i, 1);
+        }
+    }
+
+    for (let i = state.asteroids.length - 1; i >= 0; i--) {
+        const rock = state.asteroids[i];
+        rock.x += rock.vx;
+        rock.y += rock.vy;
+        rock.rot += rock.rotSpeed;
+
+        const dx = rock.x - state.player.x;
+        const dy = rock.y - state.player.y;
+        const d = Math.hypot(dx, dy);
+        if (d < rock.size + state.player.size * 0.6) {
+            if (hasStone(2) && state.phaseShieldCooldown <= 0) {
+                state.phaseShieldCooldown = 480;
+                burstParticles(rock.x, rock.y, '#ff7ed9', 16);
+            } else {
+                state.player.vx *= hasStone(0) ? 0.55 : 0.3;
+                state.player.vy *= hasStone(0) ? 0.55 : 0.3;
+                state.thanos.speed += 0.03;
+                burstParticles(state.player.x, state.player.y, '#ffb16c', 15);
+            }
+            state.asteroids.splice(i, 1);
+            continue;
+        }
+
+        if (
+            rock.x < -120 || rock.x > canvas.width + 120 ||
+            rock.y < -120 || rock.y > canvas.height + 120
+        ) {
+            state.asteroids.splice(i, 1);
+        }
+    }
+
+    if (!state.stoneAvailable) {
+        state.survivalLeft -= dt / 60;
+        if (state.survivalLeft <= 0) {
+            state.survivalLeft = 0;
+            state.stoneAvailable = true;
+            spawnLevelStone();
+            setMessage(`${STONES[state.currentLevel - 1].name} is now available!`, 150);
+        }
+    }
+
+    for (let i = state.stoneDrops.length - 1; i >= 0; i--) {
+        const stone = state.stoneDrops[i];
+        stone.spin += 0.07;
+        stone.x += stone.driftX;
+        stone.y += stone.driftY;
+
+        if (hasStone(4)) {
+            const pullX = state.player.x - stone.x;
+            const pullY = state.player.y - stone.y;
+            const dist = Math.hypot(pullX, pullY) || 1;
+            if (dist < 230) {
+                stone.x += (pullX / dist) * 0.9;
+                stone.y += (pullY / dist) * 0.9;
+            }
+        }
+
+        const dx = stone.x - state.player.x;
+        const dy = stone.y - state.player.y;
+        const d = Math.hypot(dx, dy);
+        if (d < stone.size + state.player.size * 0.7) {
+            burstParticles(stone.x, stone.y, stone.color, 25);
+            unlockStone(stone.level);
+            state.stoneDrops.splice(i, 1);
+
+            if (state.currentLevel >= 6) {
+                beginBossFight();
+            } else {
+                setupLevel(state.currentLevel + 1);
+            }
+            return;
+        }
+    }
+
+    const slowFactor = hasStone(3) ? 0.86 : 1;
+    const modeMult = thanosModeMultiplier[mode] || 1;
+    state.thanos.speed = Math.min(
+        1.92 + state.currentLevel * 0.12,
+        state.thanos.speed + (0.00018 + state.currentLevel * 0.00003) * slowFactor * modeMult
+    );
+
+    if (hasStone(5) && state.soulPulseCooldown <= 0) {
+        const dx = state.player.x - state.thanos.x;
+        const dy = state.player.y - state.thanos.y;
+        const dist = Math.hypot(dx, dy) || 1;
+        if (dist < 180) {
+            state.thanos.x -= (dx / dist) * 22;
+            state.thanos.y -= (dy / dist) * 22;
+            burstParticles(state.player.x, state.player.y, '#ff9c58', 10);
+        }
+        state.soulPulseCooldown = 350;
+    }
+
+    const tx = state.player.x - state.thanos.x;
+    const ty = state.player.y - state.thanos.y;
+    const td = Math.hypot(tx, ty) || 1;
+    state.thanos.x += (tx / td) * state.thanos.speed;
+    state.thanos.y += (ty / td) * state.thanos.speed;
+
+    const catchDistance = state.player.size + state.thanos.size * 0.72;
+    if (td < catchDistance) {
+        burstParticles(state.player.x, state.player.y, '#ff6f5e', 48);
+        endGame('Caught by Thanos');
+    }
+}
+
+function updateBoss(dt) {
+    const bossSlow = state.slowFieldTimer > 0 ? 0.45 : 1;
+
+    state.thanos.x += state.thanos.dir * (2.4 * bossSlow);
+    if (state.thanos.x < 80 || state.thanos.x > canvas.width - 80) {
+        state.thanos.dir *= -1;
+    }
+
+    state.thanos.attackCooldown -= dt;
+    if (state.thanos.attackCooldown <= 0) {
+        const count = state.thanos.hp < state.thanos.maxHp * 0.5 ? 4 : 3;
+        for (let i = 0; i < count; i++) {
+            const offset = (i - (count - 1) / 2) * 24;
+            state.enemyShots.push({
+                x: state.thanos.x + offset,
+                y: state.thanos.y + 20,
+                vx: offset * 0.02,
+                vy: (3.3 + Math.random() * 0.6) * bossSlow,
+                size: 7
+            });
+        }
+        state.thanos.attackCooldown = state.thanos.hp < state.thanos.maxHp * 0.4 ? 22 : 30;
+    }
+
+    if (state.keys.fire) {
+        shoot();
+    }
+
+    for (let i = state.shots.length - 1; i >= 0; i--) {
+        const shot = state.shots[i];
+        if (hasStone(4)) {
+            shot.vx += (state.thanos.x - shot.x) * 0.0008;
+        }
+        shot.x += shot.vx;
+        shot.y += shot.vy;
+
+        const dx = shot.x - state.thanos.x;
+        const dy = shot.y - state.thanos.y;
+        const d = Math.hypot(dx, dy);
+        if (d < state.thanos.size + shot.size + 8) {
+            state.thanos.hp -= shot.damage;
+            burstParticles(shot.x, shot.y, '#88ebff', 10);
+            if (hasStone(5)) {
+                state.player.hp = Math.min(100, state.player.hp + 1.2);
+            }
+            state.shots.splice(i, 1);
+            continue;
+        }
+
+        if (shot.y < -50 || shot.x < -50 || shot.x > canvas.width + 50) {
+            state.shots.splice(i, 1);
+        }
+    }
+
+    for (let i = state.enemyShots.length - 1; i >= 0; i--) {
+        const shot = state.enemyShots[i];
+        shot.x += shot.vx;
+        shot.y += shot.vy;
+
+        const dx = shot.x - state.player.x;
+        const dy = shot.y - state.player.y;
+        if (Math.hypot(dx, dy) < state.player.size + shot.size) {
+            state.player.hp -= 12;
+            burstParticles(state.player.x, state.player.y, '#ff6f5e', 14);
+            state.enemyShots.splice(i, 1);
+            continue;
+        }
+
+        if (shot.y > canvas.height + 60 || shot.x < -60 || shot.x > canvas.width + 60) {
+            state.enemyShots.splice(i, 1);
+        }
+    }
+
+    if (state.player.hp <= 0) {
+        endGame('Defeated in the Final Battle');
+        return;
+    }
+
+    if (state.thanos.hp <= 0) {
+        burstParticles(state.thanos.x, state.thanos.y, '#ffd75e', 120);
+        endGame('Victory: Thanos Defeated');
+    }
+}
+
+function drawHero(x, y) {
+    ctx.save();
+    ctx.translate(x, y);
+
+    ctx.fillStyle = '#7de8ff';
+    ctx.beginPath();
+    ctx.moveTo(24, 0);
+    ctx.lineTo(-14, -13);
+    ctx.lineTo(-8, 0);
+    ctx.lineTo(-14, 13);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#f7d86e';
+    ctx.beginPath();
+    ctx.arc(0, 0, 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    const flame = Math.sin(state.t * 0.35) * 6 + (hasStone(0) ? 2.5 : 0);
+    ctx.fillStyle = '#ff8a4b';
+    ctx.beginPath();
+    ctx.moveTo(-14, 0);
+    ctx.lineTo(-26 - flame, -6);
+    ctx.lineTo(-24 - flame, 0);
+    ctx.lineTo(-26 - flame, 6);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+}
+
+function drawThanos(x, y) {
+    ctx.save();
+    ctx.translate(x, y);
+
+    ctx.fillStyle = '#7047d7';
+    ctx.fillRect(-18, -20, 36, 40);
+
+    ctx.fillStyle = '#d9b271';
+    ctx.beginPath();
+    ctx.arc(0, -24, 13, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#ffbf3f';
+    ctx.fillRect(12, -7, 14, 14);
+
+    ctx.restore();
+}
+
+function drawStone(stone) {
+    ctx.save();
+    ctx.translate(stone.x, stone.y);
+    ctx.rotate(stone.spin);
+
+    ctx.fillStyle = stone.color;
+    ctx.beginPath();
+    ctx.moveTo(0, -stone.size);
+    ctx.lineTo(stone.size * 0.8, 0);
+    ctx.lineTo(0, stone.size);
+    ctx.lineTo(-stone.size * 0.8, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+function drawAsteroid(rock) {
+    ctx.save();
+    ctx.translate(rock.x, rock.y);
+    ctx.rotate(rock.rot);
+
+    ctx.fillStyle = '#9d8a84';
+    ctx.beginPath();
+    for (let i = 0; i < 7; i++) {
+        const angle = (Math.PI * 2 * i) / 7;
+        const radius = rock.size * (0.78 + Math.sin(i * 3.7) * 0.2);
+        const px = Math.cos(angle) * radius;
+        const py = Math.sin(angle) * radius;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+function drawPlatforms() {
+    if (state.levelConfig.mode !== 'platformer' || state.phase !== 'survive') return;
+    ctx.save();
+    for (const p of state.platforms) {
+        ctx.fillStyle = 'rgba(130, 200, 255, 0.32)';
+        ctx.fillRect(p.x, p.y, p.w, p.h);
+        ctx.strokeStyle = 'rgba(210, 240, 255, 0.8)';
+        ctx.strokeRect(p.x, p.y, p.w, p.h);
+    }
+    ctx.restore();
+}
+
+function drawShot(shot, enemy) {
+    ctx.save();
+    ctx.fillStyle = enemy ? '#ff8f7a' : '#9feeff';
+    ctx.beginPath();
+    ctx.arc(shot.x, shot.y, shot.size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+}
+
+function drawBossHealthBar() {
+    if (state.phase !== 'boss') return;
+    const w = Math.min(420, canvas.width * 0.78);
+    const h = 14;
+    const x = (canvas.width - w) / 2;
+    const y = 24;
+    const ratio = Math.max(0, state.thanos.hp / state.thanos.maxHp);
+
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#ff7d6b';
+    ctx.fillRect(x, y, w * ratio, h);
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.strokeRect(x, y, w, h);
+}
+
+function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    for (let i = 0; i < state.stars.length; i++) {
+        const s = state.stars[i];
+        s.twinkle += 0.02;
+        const alpha = 0.2 + Math.abs(Math.sin(s.twinkle)) * 0.8;
+        const r = s.z * 1.4;
+
+        ctx.fillStyle = `rgba(190, 225, 255, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+        ctx.fill();
+
+        s.x -= 0.6 * s.z;
+        if (s.x < -5) {
+            s.x = canvas.width + 5;
+            s.y = Math.random() * canvas.height;
+        }
+    }
+
+    for (const stone of state.stoneDrops) {
+        drawStone(stone);
+    }
+
+    for (const rock of state.asteroids) {
+        drawAsteroid(rock);
+    }
+
+    for (const shot of state.hazardShots) {
+        drawShot(shot, true);
+    }
+
+    drawPlatforms();
+
+    for (const shot of state.shots) {
+        drawShot(shot, false);
+    }
+    for (const shot of state.enemyShots) {
+        drawShot(shot, true);
+    }
+
+    drawThanos(state.thanos.x, state.thanos.y);
+    drawHero(state.player.x, state.player.y);
+
+    for (const p of state.particles) {
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = Math.max(0, p.life / 30);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+    }
+
+    if (state.phase === 'boss' && state.slowFieldTimer > 0) {
+        ctx.fillStyle = 'rgba(101,231,149,0.12)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    if (state.phase === 'survive' && state.levelConfig.mode === 'blackout') {
+        ctx.save();
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.globalCompositeOperation = 'destination-out';
+        const r = 170;
+        const g = ctx.createRadialGradient(state.player.x, state.player.y, 20, state.player.x, state.player.y, r);
+        g.addColorStop(0, 'rgba(0,0,0,1)');
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(state.player.x, state.player.y, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    drawBossHealthBar();
+}
+
+function loop() {
+    update(1);
+    render();
+    requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+function setMoveKey(key, value) {
+    if (key === 'ArrowLeft' || key === 'a' || key === 'A') state.keys.left = value;
+    if (key === 'ArrowRight' || key === 'd' || key === 'D') state.keys.right = value;
+    if (key === 'ArrowUp' || key === 'w' || key === 'W') state.keys.up = value;
+    if (key === 'ArrowDown' || key === 's' || key === 'S') state.keys.down = value;
+    if (key === ' ' || key === 'x' || key === 'X') state.keys.fire = value;
+}
+
+function requestJump() {
+    if (state.mode === 'playing' && state.phase === 'survive' && state.levelConfig.mode === 'platformer') {
+        state.requestJump = true;
+    }
+}
+
+window.addEventListener('keydown', (event) => {
+    setMoveKey(event.key, true);
+    if (event.key === 'ArrowUp' || event.key === 'w' || event.key === 'W' || event.code === 'Space' || event.key === 'x' || event.key === 'X') {
+        requestJump();
+    }
+    if (event.key === 'Shift') tryDash();
+    if ((event.key === 'c' || event.key === 'C') && state.mode === 'playing') activateTimeField();
+    if (event.code === 'Space' && state.mode !== 'playing') {
+        resetGame();
+    }
+});
+
+window.addEventListener('keyup', (event) => {
+    setMoveKey(event.key, false);
+});
+
+document.getElementById('restart-btn').addEventListener('click', resetGame);
+ui.title.addEventListener('click', () => { if (state.mode !== 'playing') resetGame(); });
+ui.title.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    if (state.mode !== 'playing') resetGame();
+}, { passive: false });
+
+function bindTouchButton(id, keyName) {
+    const btn = document.getElementById(id);
+    const press = (e) => {
+        if (e) e.preventDefault();
+        btn.classList.add('active');
+        state.keys[keyName] = true;
+        if (keyName === 'up') {
+            requestJump();
+        }
+    };
+    const release = (e) => {
+        if (e) e.preventDefault();
+        btn.classList.remove('active');
+        state.keys[keyName] = false;
+    };
+
+    btn.addEventListener('touchstart', press, { passive: false });
+    btn.addEventListener('touchend', release, { passive: false });
+    btn.addEventListener('touchcancel', release, { passive: false });
+
+    btn.addEventListener('mousedown', press);
+    btn.addEventListener('mouseup', release);
+    btn.addEventListener('mouseleave', release);
+}
+
+bindTouchButton('btn-left', 'left');
+bindTouchButton('btn-right', 'right');
+bindTouchButton('btn-up', 'up');
+bindTouchButton('btn-down', 'down');
+
+function bindFireButton() {
+    const btn = document.getElementById('btn-fire');
+    const press = (e) => {
+        if (e) e.preventDefault();
+        btn.classList.add('active');
+        state.keys.fire = true;
+        requestJump();
+    };
+    const release = (e) => {
+        if (e) e.preventDefault();
+        btn.classList.remove('active');
+        state.keys.fire = false;
+    };
+
+    btn.addEventListener('touchstart', press, { passive: false });
+    btn.addEventListener('touchend', release, { passive: false });
+    btn.addEventListener('touchcancel', release, { passive: false });
+    btn.addEventListener('mousedown', press);
+    btn.addEventListener('mouseup', release);
+    btn.addEventListener('mouseleave', release);
+}
+bindFireButton();
+
+ui.time.textContent = 'Level 1 | 0s';
+ui.boost.textContent = 'Powers: 0/6';
+</script>
+</body>
+</html>
