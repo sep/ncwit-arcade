@@ -45,7 +45,7 @@ const GAMES = [
     "title": "Barbie Road Raider",
     "author": "Copilot x Barbie Racer",
     "path": "games/barbie-road-raider/index.html",
-   "genre": "Action Driver",
+    "genre": "Action Driver",
     "color": "Sunset"
   },
   {
@@ -61,7 +61,7 @@ const GAMES = [
     "path": "games/marvel-infinity-run/index.html",
     "genre": "Space Chase",
     "color": "Neon Cyber"
-  }, 
+  },
   {
     "title": "Wholesome Cat Boxing Simulator",
     "author": "Annmarie Lee",
@@ -70,17 +70,10 @@ const GAMES = [
     "color": "Sunset"
   },
   {
-    "title": "Geometry Run",
-    "author": "sush",
-    "path": "games/sush/index.html",
-    "genre": "Platformer",
-    "color": "Neon Cyber"
-  },
-  {
-    "title": "Geometry Run",
-    "author": "geometry run",
-    "path": "games/geometry-run/index.html",
-    "genre": "Platformer",
+    "title": "A game",
+    "author": "Seth",
+    "path": "games/seth/index.html",
+    "genre": "Dodge It!",
     "color": "Neon Cyber"
   }
 ];
