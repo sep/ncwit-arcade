@@ -82,6 +82,8 @@ After your game is generated, try asking Copilot:
 - **GitHub Pages** — free static hosting
 - **GitHub Copilot** — agentic AI coding assistant
 
+## License
+MIT — see `/LICENSE`.
 
 
 
